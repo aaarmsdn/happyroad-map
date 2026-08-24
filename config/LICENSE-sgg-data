@@ -1,0 +1,8 @@
+Korean district boundary data attribution
+
+File: config/sgg.json
+Source: https://github.com/DevMinGeonPark/mapcn-kr
+Revision: 06c7a3456dd82965bd29042130441515717519ab
+Upstream data: Statistics Korea SGIS and Ministry of the Interior and Safety,
+processed by https://github.com/vuski/admdongkor and mapcn-kr.
+License: CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)

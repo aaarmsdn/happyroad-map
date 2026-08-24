@@ -1,0 +1,11 @@
+{
+  "name": "hynix-shuttle-apartment-webapp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test scripts/filter-logic.test.mjs scripts/region-match.test.mjs scripts/ui-contract.test.mjs",
+    "prices:refresh": "node scripts/refresh-prices.mjs",
+    "check": "node scripts/check-data.mjs"
+  }
+}

@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self'; object-src 'none'; base-uri 'self'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="SK하이닉스 셔틀 노선과 주변 아파트를 한 지도에서 비교합니다.">
+  <title>하이로드</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/app-icon.png">
+  <link rel="stylesheet" href="./vendor/leaflet.css">
+  <link rel="stylesheet" href="./styles.css?v=14">
+</head>
+<body>
+  <main class="app-shell">
+    <div id="map" aria-label="셔틀과 아파트 지도"></div>
+
+    <header class="app-bar">
+      <div class="brand-block">
+        <img src="./icons/app-icon.png" alt="" class="brand-icon">
+        <div>
+          <h1>하이로드</h1>
+          <p id="dataFreshness">데이터 불러오는 중</p>
+        </div>
+      </div>
+      <div class="app-actions">
+        <button class="icon-button" id="searchButton" type="button" aria-label="검색" title="검색">
+          <i data-lucide="search"></i>
+        </button>
+        <button class="icon-button" id="locateButton" type="button" aria-label="현재 위치" title="현재 위치">
+          <i data-lucide="locate-fixed"></i>
+        </button>
+        <button class="icon-button mobile-only" id="panelButton" type="button" aria-label="필터 열기" title="필터">
+          <i data-lucide="sliders-horizontal"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="map-key" aria-label="지도 범례">
+      <span class="stop-key"><i data-lucide="bus-front"></i>정류장</span>
+      <span class="apartment-key"><i data-lucide="building-2"></i>아파트</span>
+    </div>
+
+    <section class="control-panel" id="controlPanel" aria-label="지도 필터">
+      <div class="panel-handle mobile-only" aria-hidden="true"></div>
+      <div class="panel-heading">
+        <div class="segmented-control" role="tablist" aria-label="필터 종류">
+          <button class="segment active" type="button" role="tab" aria-selected="true" data-tab="shuttle">셔틀</button>
+          <button class="segment" type="button" role="tab" aria-selected="false" data-tab="apartment">아파트</button>
+        </div>
+        <button class="icon-button mobile-only" id="panelCloseButton" type="button" aria-label="필터 닫기">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="filter-view active" data-view="shuttle">
+        <div class="filter-section">
+          <span class="section-label">운행 구분</span>
+          <div class="chip-row" id="categoryChips">
+            <button class="chip active" type="button" data-category="전체">전체</button>
+            <button class="chip" type="button" data-category="출근">출근</button>
+            <button class="chip" type="button" data-category="퇴근">퇴근</button>
+            <button class="chip" type="button" data-category="기타셔틀">기타</button>
+            <button class="chip" type="button" data-category="사내셔틀">사내</button>
+          </div>
+        </div>
+        <label class="field">
+          <span>노선 검색</span>
+          <span class="input-shell"><i data-lucide="route"></i><input id="routeQuery" type="search" placeholder="노선명 또는 정류장"></span>
+        </label>
+        <label class="field">
+          <span>노선</span>
+          <select id="routeSelect"><option value="전체">전체 노선</option></select>
+        </label>
+        <div class="split-fields">
+          <label class="field">
+            <span>운행 형태</span>
+            <select id="routeTypeSelect"><option value="전체">전체</option></select>
+          </label>
+          <label class="field">
+            <span>출발 시간</span>
+            <select id="startHourSelect"><option value="">전체</option></select>
+          </label>
+        </div>
+        <label class="toggle-row">
+          <span><b>정류장 표시</b><small id="stopCount">0개</small></span>
+          <input id="showStops" type="checkbox" checked>
+        </label>
+      </div>
+
+      <div class="filter-view" data-view="apartment">
+        <div class="filter-section">
+          <span class="section-label">전용면적</span>
+          <div class="chip-row" id="areaChips">
+            <button class="chip active" type="button" data-area="전체">전체</button>
+            <button class="chip" type="button" data-area="59">59㎡</button>
+            <button class="chip" type="button" data-area="84">84㎡</button>
+            <button class="chip" type="button" data-area="102">102㎡</button>
+            <button class="chip" type="button" data-area="115">115㎡</button>
+          </div>
+        </div>
+        <label class="field range-field">
+          <span><b>정류장 거리</b><output id="distanceOutput">1.5 km</output></span>
+          <input id="distanceRange" type="range" min="0.2" max="1.5" step="0.1" value="1.5">
+        </label>
+        <div class="split-fields">
+          <label class="field">
+            <span>최소 세대수</span>
+            <input id="householdMin" type="number" min="0" step="100" value="200">
+          </label>
+          <label class="field">
+            <span>최대 통근시간</span>
+            <select id="travelTimeMax">
+              <option value="">제한 없음</option>
+              <option value="45">45분</option>
+              <option value="60">60분</option>
+              <option value="75">75분</option>
+              <option value="90">90분</option>
+            </select>
+          </label>
+        </div>
+        <label class="toggle-row">
+          <span><b>아파트 표시</b><small id="apartmentCount">0개</small></span>
+          <input id="showApartments" type="checkbox" checked>
+        </label>
+        <label class="toggle-row">
+          <span><b>가격 색상</b><small>최근 데이터 기준</small></span>
+          <input id="priceColors" type="checkbox" checked>
+        </label>
+      </div>
+
+      <div class="panel-footer">
+        <button class="text-button" id="resetButton" type="button"><i data-lucide="rotate-ccw"></i>초기화</button>
+        <span id="resultSummary">준비 중</span>
+      </div>
+    </section>
+
+    <section class="detail-panel" id="detailPanel" aria-live="polite" aria-label="선택 상세" aria-hidden="true" inert>
+      <button class="icon-button detail-close" id="detailCloseButton" type="button" aria-label="상세 닫기"><i data-lucide="x"></i></button>
+      <div id="detailContent"></div>
+    </section>
+
+    <section class="search-dialog" id="searchDialog" role="dialog" aria-modal="true" aria-label="통합 검색" aria-hidden="true" inert>
+      <div class="search-box">
+        <button class="icon-button" id="searchCloseButton" type="button" aria-label="검색 닫기"><i data-lucide="arrow-left"></i></button>
+        <input id="globalSearch" type="search" aria-label="통합 검색" placeholder="정류장, 노선, 아파트 검색" autocomplete="off">
+      </div>
+      <div class="search-results" id="searchResults"></div>
+    </section>
+
+    <div class="loading-screen" id="loadingScreen">
+      <img src="./icons/app-icon.png" alt="" class="loading-icon">
+      <strong>지도 준비 중</strong>
+      <span id="loadingText">셔틀 데이터 확인 중</span>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+  </main>
+
+  <script src="./vendor/lucide.js"></script>
+  <script src="./vendor/leaflet.js"></script>
+  <script src="./data/shuttle-data.js"></script>
+  <script type="module" src="./app-main.js?v=30"></script>
+</body>
+</html>

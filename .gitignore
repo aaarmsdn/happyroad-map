@@ -1,0 +1,5 @@
+.omo/
+.qa-*
+.env
+.env.*
+*service-account*.json
