@@ -1,10 +1,10 @@
-import { bindEvents } from "./app-events.js?v=13";
-import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=14";
-import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, verifiedPriceRecord } from "./filter-data.js?v=13";
+import { bindEvents } from "./app-events.js?v=14";
+import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=16";
+import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, priceRecordForDisplay } from "./filter-data.js?v=16";
 import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "./filter-logic.js?v=7";
-import { addApartmentMarkers, addStopMarkers, decodePolyline, groupStops } from "./map-view.js?v=20";
-import { searchResults, searchResultsHtml } from "./search-view.js?v=9";
-import { escapeHtml, formatDate } from "./ui-utils.js?v=9";
+import { addApartmentMarkers, addStopMarkers, decodePolyline, groupStops } from "./map-view.js?v=23";
+import { searchResults, searchResultsHtml } from "./search-view.js?v=10";
+import { escapeHtml, formatDate } from "./ui-utils.js?v=10";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -106,7 +106,7 @@ function openDetail(html) {
   panel.scrollTop = 0;
   $("#controlPanel").classList.remove("open");
   lucide.createIcons();
-  $("#detailCloseButton").focus();
+  $("#detailCloseButton").focus({ preventScroll: true });
 }
 
 function closeDetail() {
@@ -126,7 +126,7 @@ function openApartmentDetail(complex, nearestLink = linksByComplex.get(complex.i
   openDetail(apartmentDetailHtml({
     complex, nearestLink,
     relatedLinks: (linksByComplex.get(complex.id) || []).slice().sort((a, b) => a.distanceKm - b.distanceKm),
-    record: verifiedPriceRecord(prices, complex.id, complex.regionCode), selectedArea: state.area
+    record: priceRecordForDisplay(prices, complex.id, complex.regionCode), selectedArea: state.area
   }));
 }
 

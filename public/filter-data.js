@@ -1,5 +1,5 @@
 import { hourOf } from "./filter-logic.js?v=7";
-import { normalize } from "./ui-utils.js?v=9";
+import { normalize } from "./ui-utils.js?v=10";
 
 export function entryMatches(entry, state) {
   const query = normalize(state.routeQuery);
@@ -28,14 +28,18 @@ export function matchingApartmentLinks(links, state, routeNames, complexById) {
   return result;
 }
 
-export function verifiedPriceRecord(prices, complexId, expectedRegionCode) {
+export function priceRecordForDisplay(prices, complexId, expectedRegionCode) {
   const record = prices.complexes[complexId];
-  if (!record || !/^\d{5}$/.test(expectedRegionCode) || record.matchStatus !== "matched" || record.matchMethod !== "normalized_name_and_lawd_cd_from_boundary" || record.matchRegionCode !== expectedRegionCode) return null;
+  const currentApiMatch = record?.matchStatus === "matched" && record.matchMethod === "normalized_name_and_lawd_cd_from_boundary";
+  const pinnedSnapshot = record?.matchStatus === "snapshot"
+    && record.matchMethod === "official_snapshot_by_complex_id"
+    && /^[a-f0-9]{64}$/.test(prices.snapshot?.sha256);
+  if (!/^\d{5}$/.test(expectedRegionCode) || (!currentApiMatch && !pinnedSnapshot) || record.matchRegionCode !== expectedRegionCode) return null;
   return record;
 }
 
 export function priceFor(prices, state, complexId, expectedRegionCode) {
-  const record = verifiedPriceRecord(prices, complexId, expectedRegionCode);
+  const record = priceRecordForDisplay(prices, complexId, expectedRegionCode);
   if (!record) return null;
   const areas = state.area === "전체" ? ["84", "59", "102", "115"] : [state.area];
   for (const area of areas) {

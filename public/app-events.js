@@ -1,4 +1,4 @@
-import { debounce } from "./ui-utils.js?v=9";
+import { debounce } from "./ui-utils.js?v=10";
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];

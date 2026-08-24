@@ -1,14 +1,16 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { priceRecordForDisplay } from "../public/filter-data.js";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(projectDir, "public", "data");
-const [apartments, prices, boundaries] = await Promise.all([
+const [apartments, prices, boundaries, snapshotProvenance] = await Promise.all([
   readFile(path.join(dataDir, "apartments.json"), "utf8").then(JSON.parse),
   readFile(path.join(dataDir, "prices.json"), "utf8").then(JSON.parse),
-  readFile(path.join(projectDir, "config", "sgg.json"), "utf8").then(JSON.parse)
+  readFile(path.join(projectDir, "config", "sgg.json"), "utf8").then(JSON.parse),
+  readFile(path.join(projectDir, "config", "price-snapshot.json"), "utf8").then(JSON.parse)
 ]);
 
 if (!Array.isArray(apartments.complexes) || apartments.complexes.length < 1) throw new Error("No apartment complexes");
@@ -18,11 +20,18 @@ if (apartments.complexes.some(complex => "listings" in complex)) throw new Error
 if (Object.values(prices.complexes).some(record => "naverMarker" in record || "trends" in record)) throw new Error("Third-party price snapshots must not be committed");
 if (JSON.stringify(prices).toLowerCase().includes("naver")) throw new Error("Third-party price provenance must not be committed");
 const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
-const unverifiedPrices = Object.entries(prices.complexes).filter(([complexId, record]) =>
+const hiddenPrices = Object.entries(prices.complexes).filter(([complexId, record]) =>
   Object.values(record.areas || {}).some(area => Number(area?.median) > 0)
-    && (record.matchStatus !== "matched" || record.matchRegionCode !== complexById.get(complexId)?.regionCode || record.matchMethod !== "normalized_name_and_lawd_cd_from_boundary")
+    && priceRecordForDisplay(prices, complexId, complexById.get(complexId)?.regionCode) !== record
 );
-if (unverifiedPrices.length) throw new Error(`${unverifiedPrices.length} displayed prices lack verified district provenance`);
+if (hiddenPrices.length) throw new Error(`${hiddenPrices.length} priced records do not satisfy display provenance rules`);
+const snapshotRecords = Object.values(prices.complexes).filter(record => record.matchMethod === "official_snapshot_by_complex_id");
+if (snapshotRecords.length && (prices.snapshot?.sha256 !== snapshotProvenance.sha256 || prices.snapshot?.generatedAt !== snapshotProvenance.generatedAt)) throw new Error("Official snapshot provenance does not match the pinned source metadata");
+if (snapshotRecords.some(record => record.source !== snapshotProvenance.source)) throw new Error("Official snapshot records have inconsistent source metadata");
+const missingAreaTags = Object.entries(prices.complexes).flatMap(([complexId, record]) => Object.entries(record.areas || {})
+  .filter(([band, area]) => Number(area?.median) > 0 && !complexById.get(complexId)?.areaTags.includes(band))
+  .map(([area]) => `${complexId}:${area}`));
+if (missingAreaTags.length) throw new Error(`${missingAreaTags.length} priced apartment areas are missing filter tags`);
 
 const complexIds = new Set(apartments.complexes.map(item => item.id));
 const brokenLinks = apartments.links.filter(link => !complexIds.has(link.complexId));

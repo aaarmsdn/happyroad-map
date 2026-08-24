@@ -1,0 +1,9 @@
+{
+  "sourceFile": "happyroad_actual_price_data.js",
+  "sourcePathHint": "hynix_apartment_preview_v2_5/happyroad_actual_price_data.js",
+  "sourceVersion": "v2_5",
+  "sha256": "1662dbd940a2f55b93e9f5062480aa614df6fc521a5c068c1b23d7ebda8400a2",
+  "generatedAt": "2026-05-29T15:03:54+09:00",
+  "recordMatchBasis": "v2_5 matched records keyed by complex ID; current boundary region is attached only as a display guard",
+  "source": "국토교통부 아파트 매매 실거래 공개자료 스냅샷"
+}

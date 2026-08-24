@@ -127,6 +127,7 @@ const [apartments, prices, boundaries] = await Promise.all([
 ]);
 
 const districts = prepareDistricts(boundaries);
+const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
 const regionByComplex = new Map(apartments.complexes.map(complex => [complex.id, regionCodeFor(complex, districts)]));
 const unmappedComplexes = [...regionByComplex.values()].filter(code => !code).length;
 const derivedRegionCodes = [...new Set([...regionByComplex.values()].filter(Boolean))].sort();
@@ -175,6 +176,7 @@ for (const trade of trades) {
 if (!grouped.size) throw new Error("MOLIT trades matched no configured apartment; existing prices were preserved.");
 
 for (const [complexId, complexTrades] of grouped) {
+  const complex = complexById.get(complexId);
   const record = prices.complexes[complexId] || {};
   record.matchStatus = "matched";
   record.matchMethod = "normalized_name_and_lawd_cd_from_boundary";
@@ -184,9 +186,12 @@ for (const [complexId, complexTrades] of grouped) {
   record.source = "국토교통부 아파트 매매 실거래가 API";
   record.areas = Object.fromEntries(["59", "84", "102", "115"].map(band => [band, summarize(complexTrades.filter(trade => trade.band === band).map(trade => trade.amount))]));
   prices.complexes[complexId] = record;
+  const observedAreas = Object.entries(record.areas).filter(([, area]) => area.count > 0).map(([band]) => band);
+  complex.areaTags = ["59", "84", "102", "115"].filter(band => complex.areaTags.includes(band) || observedAreas.includes(band));
 }
 
-prices.generatedAt = new Date().toISOString();
+const generatedAt = new Date().toISOString();
+prices.generatedAt = generatedAt;
 prices.refresh = {
   source: "국토교통부 아파트 매매 실거래가 API",
   regionCodes,
@@ -198,5 +203,12 @@ prices.refresh = {
   skippedRegionMismatch,
   skippedAmbiguous
 };
-await writeFile(pricePath, JSON.stringify(prices));
+apartments.areaTagsGeneratedAt = generatedAt;
+apartments.source.areaTagSource = "국토교통부 아파트 매매 실거래가 API";
+apartments.stats.priceStatus = "official_api_refreshed";
+apartments.stats.areaCounts = Object.fromEntries(["59", "84", "102", "115"].map(band => [band, apartments.complexes.filter(complex => complex.areaTags.includes(band)).length]));
+await Promise.all([
+  writeFile(apartmentPath, JSON.stringify(apartments)),
+  writeFile(pricePath, JSON.stringify(prices))
+]);
 console.log(JSON.stringify(prices.refresh, null, 2));

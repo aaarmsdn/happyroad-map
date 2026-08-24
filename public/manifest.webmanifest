@@ -1,7 +1,7 @@
 {
   "name": "하이로드 - 셔틀과 아파트",
   "short_name": "하이로드",
-  "description": "SK하이닉스 셔틀 노선과 주변 아파트 지도",
+  "description": "이동 경로와 주변 아파트 지도",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7f7",

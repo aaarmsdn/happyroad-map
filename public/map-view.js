@@ -1,4 +1,4 @@
-import { escapeHtml, formatPrice } from "./ui-utils.js?v=9";
+import { escapeHtml, formatPrice } from "./ui-utils.js?v=10";
 
 function clusterItems(items, pointOf, cellSize) {
   const buckets = new Map();
@@ -26,7 +26,7 @@ function stopColor(stop) {
 function compactPrice(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return "";
-  if (amount < 10000) return `${Math.round(amount / 1000) / 10}천`;
+  if (amount < 10000) return `${Math.round(amount).toLocaleString("ko-KR")}만`;
   const eok = amount / 10000;
   return `${Number.isInteger(eok) ? eok : eok.toFixed(1)}억`;
 }
@@ -78,6 +78,13 @@ function stopIcon(L, stop) {
 
 function apartmentIcon(L, color) {
   return markerIcon(L, `<span class="map-marker apartment-marker" style="--marker-color:${color}"><i data-lucide="building-2"></i></span>`, [44, 44]);
+}
+
+function apartmentPriceIcon(L, value, color) {
+  const label = compactPrice(value);
+  return label
+    ? markerIcon(L, `<span class="apartment-price-marker" style="--marker-color:${color}"><i data-lucide="building-2"></i><b>${label}</b></span>`, [66, 44])
+    : apartmentIcon(L, color);
 }
 
 export function groupStops(entries) {
@@ -135,10 +142,10 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
   const items = [...visibleLinks]
     .map(([complexId, link]) => ({ complex: complexById.get(complexId), link }))
     .filter(item => bounds.contains([item.complex.lat, item.complex.lng]));
-  if (map.getZoom() < 12) {
+  if (map.getZoom() < 14) {
     const cellSize = 0.05 * 2 ** (11 - map.getZoom());
     const clusters = clusterItems(items, item => [item.complex.lat, item.complex.lng], cellSize);
-    const markerPoints = spreadMarkerPoints(clusters.map(cluster => map.latLngToLayerPoint([cluster.lat, cluster.lng])), 42, occupiedPoints);
+    const markerPoints = spreadMarkerPoints(clusters.map(cluster => map.latLngToLayerPoint([cluster.lat, cluster.lng])), 68, occupiedPoints);
     for (const [index, cluster] of clusters.entries()) {
       const markerLatLng = map.layerPointToLatLng(markerPoints[index]);
       const single = cluster.items.length === 1 ? cluster.items[0] : null;
@@ -150,8 +157,9 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
         addAccessibleMarker(marker, layer, `아파트 ${cluster.items.length.toLocaleString("ko-KR")}단지`);
         continue;
       }
-      const marker = L.marker(markerLatLng, { icon: apartmentIcon(L, colorOf(priceOf(single.complex.id))), zIndexOffset: 200 });
-      marker.bindTooltip(escapeHtml(single.complex.name), { direction: "top" });
+      const median = priceOf(single.complex.id);
+      const marker = L.marker(markerLatLng, { icon: apartmentPriceIcon(L, median, colorOf(median)), zIndexOffset: 200 });
+      marker.bindTooltip(`${escapeHtml(single.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}`, { direction: "top" });
       marker.on("click", () => onSelect(single.complex, single.link));
       addAccessibleMarker(marker, layer, single.complex.name);
     }
@@ -160,11 +168,8 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
   const markerPoints = spreadMarkerPoints(items.map(item => map.latLngToLayerPoint([item.complex.lat, item.complex.lng])), 68, occupiedPoints);
   items.forEach((item, index) => {
     const median = priceOf(item.complex.id);
-    const label = compactPrice(median);
     const color = colorOf(median);
-    const icon = label
-      ? markerIcon(L, `<span class="apartment-price-marker" style="--marker-color:${color}"><i data-lucide="building-2"></i><b>${label}</b></span>`, [66, 44])
-      : apartmentIcon(L, color);
+    const icon = apartmentPriceIcon(L, median, color);
     const marker = L.marker(map.layerPointToLatLng(markerPoints[index]), { icon, zIndexOffset: 200 });
     marker.bindTooltip(`${escapeHtml(item.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}`, { direction: "top" });
     marker.on("click", () => onSelect(item.complex, item.link));

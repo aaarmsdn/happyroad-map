@@ -1,4 +1,4 @@
-import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=9";
+import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
 
 export function stopDetailHtml(stop) {
   const variants = [...new Map(stop.entries.map(entry => [entry.uidKey, entry])).values()]
@@ -46,7 +46,7 @@ export function apartmentDetailHtml({ complex, nearestLink, relatedLinks, record
       <div class="metric"><span>통근</span><b>${nearestLink?.travelMinutes ? `${escapeHtml(nearestLink.travelMinutes)}분` : "-"}</b></div>
     </div>
     <h3 class="detail-subtitle">최근 실거래</h3>
-    <p class="source-note">국토교통부 · 최근 거래일 ${formatDate(record?.latestTradeDate)}</p>
+    <p class="source-note">${record?.matchStatus === "snapshot" ? "국토교통부 공개자료 스냅샷" : "국토교통부 API"} · 최근 거래일 ${formatDate(record?.latestTradeDate)}</p>
     ${areaMetrics(record, selectedArea)}
     <div class="route-list">
       ${relatedLinks.slice(0, 5).map(link => `<button class="route-item" type="button" data-route-name="${escapeHtml(link.routes[0] || "")}"><span><b>${escapeHtml(link.station)}</b><small>${escapeHtml(link.routes.slice(0, 2).join(" · ") || "연결 노선")}</small></span><span class="route-time">${link.travelMinutes ? `${escapeHtml(link.travelMinutes)}분` : `${link.distanceKm.toFixed(1)}km`}</span></button>`).join("")}

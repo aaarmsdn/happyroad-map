@@ -1,4 +1,4 @@
-import { escapeHtml, normalize } from "./ui-utils.js?v=9";
+import { escapeHtml, normalize } from "./ui-utils.js?v=10";
 
 export function searchResults(query, stations, routes, complexes) {
   const normalized = normalize(query);
