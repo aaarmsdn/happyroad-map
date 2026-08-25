@@ -80,8 +80,11 @@ function median(values) {
   return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 }
 
-function summarize(values) {
-  return values.length ? { count: values.length, min: Math.min(...values), median: median(values), max: Math.max(...values) } : { count: 0, min: null, median: null, max: null };
+function summarize(trades) {
+  if (!trades.length) return { count: 0, min: null, median: null, max: null, medianPerPyeong: null };
+  const amounts = trades.map(trade => trade.amount);
+  const perPyeong = trades.map(trade => Math.round(trade.amount * 3.305785 / trade.area));
+  return { count: trades.length, min: Math.min(...amounts), median: median(amounts), max: Math.max(...amounts), medianPerPyeong: median(perPyeong) };
 }
 
 function areaBand(area) {
@@ -92,6 +95,9 @@ function areaBand(area) {
 
 async function fetchMonth(serviceKey, regionCode, month) {
   const trades = [];
+  let receivedItems = 0;
+  let expectedTotal = null;
+  const seenPageItems = new Set();
   let page = 1;
   while (true) {
     const url = new URL(endpoint);
@@ -100,15 +106,28 @@ async function fetchMonth(serviceKey, regionCode, month) {
     url.searchParams.set("DEAL_YMD", month);
     url.searchParams.set("pageNo", String(page));
     url.searchParams.set("numOfRows", "1000");
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!response.ok) throw new Error(`MOLIT ${regionCode}/${month}: HTTP ${response.status}`);
     const xml = await response.text();
     const resultCode = xmlValue(xml, "resultCode");
-    if (resultCode && resultCode !== "000") throw new Error(`MOLIT ${regionCode}/${month}: ${resultCode} ${xmlValue(xml, "resultMsg")}`);
+    if (resultCode !== "000") throw new Error(`MOLIT ${regionCode}/${month}: ${resultCode || "missing resultCode"} ${xmlValue(xml, "resultMsg")}`);
+    const totalValue = xmlValue(xml, "totalCount");
+    if (!/^\d+$/.test(totalValue)) throw new Error(`MOLIT ${regionCode}/${month}: missing totalCount`);
+    const rawItems = [...xml.matchAll(/<item>[\s\S]*?<\/item>/g)].map(match => match[0]);
+    const rawItemCount = rawItems.length;
+    const pageItems = rawItems.join("");
+    if (rawItemCount && seenPageItems.has(pageItems)) throw new Error(`MOLIT ${regionCode}/${month}: repeated pagination page`);
+    if (rawItemCount) seenPageItems.add(pageItems);
     const pageTrades = parseTrades(xml).map(trade => ({ ...trade, regionCode }));
     trades.push(...pageTrades);
-    const total = Number(xmlValue(xml, "totalCount")) || pageTrades.length;
-    if (trades.length >= total || pageTrades.length < 1000) return trades;
+    receivedItems += rawItemCount;
+    const total = Number(totalValue);
+    if (expectedTotal === null) expectedTotal = total;
+    else if (total !== expectedTotal) throw new Error(`MOLIT ${regionCode}/${month}: totalCount changed during pagination`);
+    if (receivedItems > total) throw new Error(`MOLIT ${regionCode}/${month}: item count exceeds totalCount`);
+    if (receivedItems >= total) return trades;
+    if (!rawItemCount) throw new Error(`MOLIT ${regionCode}/${month}: pagination ended before totalCount`);
+    if (page >= 1000) throw new Error(`MOLIT ${regionCode}/${month}: pagination limit exceeded`);
     page += 1;
   }
 }
@@ -120,10 +139,12 @@ const monthsCount = Math.min(12, Math.max(1, Number(process.env.MOLIT_MONTHS || 
 const apartmentPath = path.join(projectDir, "public", "data", "apartments.json");
 const pricePath = path.join(projectDir, "public", "data", "prices.json");
 const boundaryPath = path.join(projectDir, "config", "sgg.json");
-const [apartments, prices, boundaries] = await Promise.all([
+const aliasPath = path.join(projectDir, "config", "price-name-aliases.json");
+const [apartments, prices, boundaries, nameAliases] = await Promise.all([
   readFile(apartmentPath, "utf8").then(JSON.parse),
   readFile(pricePath, "utf8").then(JSON.parse),
-  readFile(boundaryPath, "utf8").then(JSON.parse)
+  readFile(boundaryPath, "utf8").then(JSON.parse),
+  readFile(aliasPath, "utf8").then(JSON.parse)
 ]);
 
 const districts = prepareDistricts(boundaries);
@@ -142,6 +163,17 @@ for (const complex of apartments.complexes) {
   if (!idsByName.has(name)) idsByName.set(name, []);
   idsByName.get(name).push(complex.id);
 }
+const idsByAlias = new Map();
+for (const [complexId, aliases] of Object.entries(nameAliases)) {
+  if (!complexById.has(complexId) || !Array.isArray(aliases)) throw new Error(`Invalid price alias config for complex ${complexId}.`);
+  for (const alias of aliases) {
+    if (typeof alias !== "string") throw new Error(`Invalid non-string price alias for complex ${complexId}.`);
+    const name = normalizeName(alias);
+    if (!name) throw new Error(`Invalid empty price alias for complex ${complexId}.`);
+    if (!idsByAlias.has(name)) idsByAlias.set(name, []);
+    idsByAlias.get(name).push(complexId);
+  }
+}
 
 const trades = [];
 for (const regionCode of regionCodes) {
@@ -153,25 +185,29 @@ const grouped = new Map();
 let skippedAmbiguous = 0;
 let skippedNoName = 0;
 let skippedRegionMismatch = 0;
+let matchedByAlias = 0;
 for (const trade of trades) {
-  const ids = idsByName.get(normalizeName(trade.name));
-  if (!ids?.length) {
-    skippedNoName += 1;
-    continue;
-  }
-  const regionIds = ids.filter(id => regionByComplex.get(id) === trade.regionCode);
+  const ids = idsByName.get(normalizeName(trade.name)) || [];
+  let regionIds = ids.filter(id => regionByComplex.get(id) === trade.regionCode);
+  let aliasMatch = false;
   if (!regionIds.length) {
-    skippedRegionMismatch += 1;
+    regionIds = (idsByAlias.get(normalizeName(trade.name)) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
+    aliasMatch = regionIds.length > 0;
+  }
+  if (!regionIds.length) {
+    if (ids.length) skippedRegionMismatch += 1;
+    else skippedNoName += 1;
     continue;
   }
   if (regionIds.length !== 1) {
     skippedAmbiguous += 1;
     continue;
   }
+  if (aliasMatch) matchedByAlias += 1;
   const band = areaBand(trade.area);
   if (!band) continue;
   if (!grouped.has(regionIds[0])) grouped.set(regionIds[0], []);
-  grouped.get(regionIds[0]).push({ ...trade, band });
+  grouped.get(regionIds[0]).push({ ...trade, band, aliasMatch });
 }
 if (!grouped.size) throw new Error("MOLIT trades matched no configured apartment; existing prices were preserved.");
 
@@ -179,12 +215,15 @@ for (const [complexId, complexTrades] of grouped) {
   const complex = complexById.get(complexId);
   const record = prices.complexes[complexId] || {};
   record.matchStatus = "matched";
-  record.matchMethod = "normalized_name_and_lawd_cd_from_boundary";
+  record.matchMethod = complexTrades.some(trade => trade.aliasMatch)
+    ? "configured_alias_and_lawd_cd_from_boundary"
+    : "normalized_name_and_lawd_cd_from_boundary";
   record.matchRegionCode = complexTrades[0].regionCode;
   record.matchedTradeCount = complexTrades.length;
   record.latestTradeDate = complexTrades.map(trade => trade.date).sort().at(-1);
   record.source = "국토교통부 아파트 매매 실거래가 API";
-  record.areas = Object.fromEntries(["59", "84", "102", "115"].map(band => [band, summarize(complexTrades.filter(trade => trade.band === band).map(trade => trade.amount))]));
+  record.medianPerPyeong = median(complexTrades.map(trade => Math.round(trade.amount * 3.305785 / trade.area)));
+  record.areas = Object.fromEntries(["59", "84", "102", "115"].map(band => [band, summarize(complexTrades.filter(trade => trade.band === band))]));
   prices.complexes[complexId] = record;
   const observedAreas = Object.entries(record.areas).filter(([, area]) => area.count > 0).map(([band]) => band);
   complex.areaTags = ["59", "84", "102", "115"].filter(band => complex.areaTags.includes(band) || observedAreas.includes(band));
@@ -201,7 +240,8 @@ prices.refresh = {
   unmappedComplexes,
   skippedNoName,
   skippedRegionMismatch,
-  skippedAmbiguous
+  skippedAmbiguous,
+  matchedByAlias
 };
 apartments.areaTagsGeneratedAt = generatedAt;
 apartments.source.areaTagSource = "국토교통부 아파트 매매 실거래가 API";

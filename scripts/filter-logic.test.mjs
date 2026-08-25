@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { matchingApartmentLinks } from "../public/filter-data.js";
+import { matchingApartmentLinks, priceColor, pricePerPyeong, pricePerPyeongFor } from "../public/filter-data.js";
 import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "../public/filter-logic.js";
 
 test("single-digit shuttle hours are normalized", () => {
@@ -39,4 +39,26 @@ test("all known Seongsu Lotte Castle Park unit sizes remain selectable", async (
     }, routeNames, complexById);
     assert.equal(result.has(complex.id), true, `${area}㎡ filter excluded the complex`);
   }
+});
+
+test("apartment colors use median price per pyeong", () => {
+  const record = {
+    matchStatus: "matched", matchMethod: "normalized_name_and_lawd_cd_from_boundary", matchRegionCode: "11215",
+    medianPerPyeong: 3400,
+    areas: {
+      "59": { count: 1, median: 60000, medianPerPyeong: 3000 },
+      "84": { count: 2, median: 84000, medianPerPyeong: 3500 }
+    }
+  };
+  const prices = { complexes: { "1": record } };
+  assert.equal(pricePerPyeong(84000, 84), 3306);
+  assert.equal(pricePerPyeongFor(prices, { area: "84" }, "1", "11215"), 3500);
+  assert.equal(pricePerPyeongFor(prices, { area: "전체" }, "1", "11215"), 3400);
+  delete record.medianPerPyeong;
+  assert.equal(pricePerPyeongFor(prices, { area: "전체" }, "1", "11215"), 3500);
+  assert.equal(priceColor({ priceColors: true }, 2499), "#18864b");
+  assert.equal(priceColor({ priceColors: true }, 2500), "#2774ae");
+  assert.equal(priceColor({ priceColors: true }, 4000), "#d6a01d");
+  assert.equal(priceColor({ priceColors: true }, 6000), "#f07835");
+  assert.equal(priceColor({ priceColors: true }, 8000), "#d83a3a");
 });

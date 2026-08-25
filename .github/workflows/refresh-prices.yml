@@ -1,6 +1,11 @@
 name: Refresh apartment prices
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/refresh-prices.mjs"
+      - ".github/workflows/refresh-prices.yml"
   schedule:
     - cron: "17 19 * * 1"
   workflow_dispatch:
@@ -18,6 +23,7 @@ jobs:
       - name: Refresh official transaction prices
         env:
           MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+          MOLIT_MONTHS: "12"
         run: npm run prices:refresh
       - name: Validate generated data
         run: npm run check

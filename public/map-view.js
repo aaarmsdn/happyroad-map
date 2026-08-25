@@ -143,7 +143,7 @@ export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
   return renderedPoints;
 }
 
-export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, priceOf, colorOf, onSelect, occupiedPoints = [] }) {
+export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, priceOf, perPyeongOf = () => null, colorOf, onSelect, occupiedPoints = [] }) {
   const bounds = map.getBounds().pad(0.2);
   const items = [...visibleLinks]
     .map(([complexId, link]) => ({ complex: complexById.get(complexId), link }))
@@ -171,8 +171,9 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
         continue;
       }
       const median = priceOf(single.complex.id);
-      const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, median, colorOf(median)), zIndexOffset: 200 });
-      marker.bindTooltip(`${escapeHtml(single.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}`, { direction: "top" });
+      const perPyeong = perPyeongOf(single.complex.id);
+      const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, median, colorOf(perPyeong)), zIndexOffset: 200 });
+      marker.bindTooltip(`${escapeHtml(single.complex.name)}${median ? ` · ${formatPrice(median)}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}` : ""}`, { direction: "top" });
       marker.on("click", () => onSelect(single.complex, single.link));
       addAccessibleMarker(marker, layer, single.complex.name);
     }
@@ -180,10 +181,11 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
   }
   items.forEach(item => {
     const median = priceOf(item.complex.id);
-    const color = colorOf(median);
+    const perPyeong = perPyeongOf(item.complex.id);
+    const color = colorOf(perPyeong);
     const icon = apartmentPriceIcon(L, median, color);
     const marker = L.marker([item.complex.lat, item.complex.lng], { icon, zIndexOffset: 200 });
-    marker.bindTooltip(`${escapeHtml(item.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}`, { direction: "top" });
+    marker.bindTooltip(`${escapeHtml(item.complex.name)}${median ? ` · ${formatPrice(median)}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}` : ""}`, { direction: "top" });
     marker.on("click", () => onSelect(item.complex, item.link));
     addAccessibleMarker(marker, layer, item.complex.name);
   });

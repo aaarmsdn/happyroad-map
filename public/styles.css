@@ -211,6 +211,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .map-key svg { width: 14px; height: 14px; }
 .map-key .stop-key { color: var(--ink); }
 .map-key .apartment-key { color: var(--accent); }
+.map-key .price-key { gap: 2px; color: var(--text-muted); font-size: 9px; }
+.map-key .price-key i { width: 8px; height: 8px; border-radius: 50%; background: #18864b; }
+.map-key .price-key i:nth-of-type(2) { background: #2774ae; }
+.map-key .price-key i:nth-of-type(3) { background: #d6a01d; }
+.map-key .price-key i:nth-of-type(4) { background: #f07835; }
+.map-key .price-key i:nth-of-type(5) { background: #d83a3a; }
+.map-key .price-key b { font-weight: 700; }
 @media (min-width: 860px) {
   .app-bar { right: 350px; }
   .leaflet-top.leaflet-left { top: 76px; }

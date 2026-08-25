@@ -1,8 +1,8 @@
 import { bindEvents } from "./app-events.js?v=14";
-import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=16";
-import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=18";
+import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=18";
+import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, pricePerPyeongFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=21";
 import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "./filter-logic.js?v=7";
-import { addApartmentMarkers, addStopMarkers, decodePolyline, groupStops } from "./map-view.js?v=26";
+import { addApartmentMarkers, addStopMarkers, decodePolyline, groupStops } from "./map-view.js?v=27";
 import { searchResults, searchResultsHtml } from "./search-view.js?v=10";
 import { escapeHtml, formatDate } from "./ui-utils.js?v=10";
 
@@ -80,6 +80,7 @@ function renderMap(clearRoute = true) {
   if (state.showApartments) addApartmentMarkers({
     L, map, layer: apartmentLayer, visibleLinks, complexById,
     priceOf: id => priceFor(prices, state, id, complexById.get(id)?.regionCode),
+    perPyeongOf: id => pricePerPyeongFor(prices, state, id, complexById.get(id)?.regionCode),
     colorOf: value => priceColor(state, value),
     onSelect: openApartmentDetail,
     occupiedPoints

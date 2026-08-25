@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node --test scripts/filter-logic.test.mjs scripts/map-view.test.mjs scripts/region-match.test.mjs scripts/ui-contract.test.mjs",
+    "test": "node --test scripts/filter-logic.test.mjs scripts/map-view.test.mjs scripts/price-refresh.test.mjs scripts/region-match.test.mjs scripts/ui-contract.test.mjs",
     "prices:import-snapshot": "node scripts/import-price-snapshot.mjs",
     "prices:refresh": "node scripts/refresh-prices.mjs",
     "check": "node scripts/check-data.mjs"

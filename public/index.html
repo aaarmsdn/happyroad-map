@@ -11,7 +11,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/app-icon.png">
   <link rel="stylesheet" href="./vendor/leaflet.css">
-  <link rel="stylesheet" href="./styles.css?v=14">
+  <link rel="stylesheet" href="./styles.css?v=15">
 </head>
 <body>
   <main class="app-shell">
@@ -40,7 +40,8 @@
 
     <div class="map-key" aria-label="지도 범례">
       <span class="stop-key"><i data-lucide="bus-front"></i>정류장</span>
-      <span class="apartment-key"><i data-lucide="building-2"></i>아파트</span>
+      <span class="apartment-key"><i data-lucide="building-2"></i>아파트 평당가</span>
+      <span class="price-key" aria-label="평당 2천5백만원 미만부터 8천만원 이상"><b>낮음</b><i></i><i></i><i></i><i></i><i></i><b>높음</b></span>
     </div>
 
     <section class="control-panel" id="controlPanel" aria-label="지도 필터">
@@ -126,7 +127,7 @@
           <input id="showApartments" type="checkbox" checked>
         </label>
         <label class="toggle-row">
-          <span><b>가격 색상</b><small>최근 데이터 기준</small></span>
+          <span><b>가격 색상</b><small>최근 평당 실거래 기준</small></span>
           <input id="priceColors" type="checkbox" checked>
         </label>
       </div>
@@ -161,6 +162,6 @@
   <script src="./vendor/lucide.js"></script>
   <script src="./vendor/leaflet.js"></script>
   <script src="./data/shuttle-data.js"></script>
-  <script type="module" src="./app-main.js?v=39"></script>
+  <script type="module" src="./app-main.js?v=42"></script>
 </body>
 </html>

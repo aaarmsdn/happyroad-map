@@ -1,4 +1,5 @@
 import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
+import { pricePerPyeong } from "./filter-data.js?v=21";
 
 export function stopDetailHtml(stop) {
   const variants = [...new Map(stop.entries.map(entry => [entry.uidKey, entry])).values()]
@@ -32,7 +33,8 @@ function areaMetrics(record, selectedArea) {
   if (!available.length) return `<p class="empty-note">선택 면적의 최근 실거래가가 없습니다.</p>`;
   return `<div class="price-list">${available.map(area => {
     const data = record.areas[area];
-    return `<div class="price-row"><b>${area}㎡</b><span>${formatPrice(data.median)}</span><small>${data.count}건 · ${formatPrice(data.min)}~${formatPrice(data.max)}</small></div>`;
+    const perPyeong = Number(data.medianPerPyeong) || pricePerPyeong(data.median, area);
+    return `<div class="price-row"><b>${area}㎡</b><span>${formatPrice(data.median)}</span><small>평당 ${perPyeong.toLocaleString("ko-KR")}만 · ${data.count}건 · ${formatPrice(data.min)}~${formatPrice(data.max)}</small></div>`;
   }).join("")}</div>`;
 }
 

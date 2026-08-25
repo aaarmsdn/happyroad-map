@@ -167,6 +167,7 @@ test("a selected stop chooses its first routable entry allowed by every shuttle 
 
 test("apartment markers render sub-100-million-won prices in ten-thousand-won units", () => {
   const iconHtml = [];
+  const colorInputs = [];
   const L = {
     divIcon: options => { iconHtml.push(options.html); return options; },
     marker: latLng => ({
@@ -186,9 +187,13 @@ test("apartment markers render sub-100-million-won prices in ten-thousand-won un
   addApartmentMarkers({
     L, map, layer: {}, visibleLinks: new Map([["1", {}]]),
     complexById: new Map([["1", { id: "1", name: "단지", lat: 37.5, lng: 127 }]]),
-    priceOf: () => 8500, colorOf: () => "#f04438", onSelect: () => {}
+    priceOf: () => 8500,
+    perPyeongOf: () => 3306,
+    colorOf: value => { colorInputs.push(value); return "#f04438"; },
+    onSelect: () => {}
   });
   assert.match(iconHtml.join(""), />8,500만</);
+  assert.deepEqual(colorInputs, [3306]);
 });
 
 test("dense coincident cluster summaries never overlap", () => {
