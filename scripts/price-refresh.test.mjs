@@ -38,11 +38,14 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
   ]);
   const preloadPath = path.join(tempDir, "molit-name-alias.mjs");
   await writeFile(preloadPath, `const months = [];
+let requests = 0;
 globalThis.fetch = async url => {
+  requests += 1;
+  if (requests === 1) throw new TypeError("temporary network failure");
   months.push(new URL(url).searchParams.get("DEAL_YMD"));
   return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>4</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양한빛9</aptNm><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><buildYear>2008</buildYear><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>광진새빛8</aptNm><excluUseAr>84</excluUseAr><dealAmount>80,000</dealAmount><buildYear>2009</buildYear><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item></items></body></response>\`, { status: 200 });
 };
-process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\`));`);
+process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQUESTS=\${requests}\`));`);
 
   try {
     const result = await new Promise(resolve => {
@@ -76,6 +79,7 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\`));`
       return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
     });
     assert.deepEqual(months, expectedMonths);
+    assert.match(result.stderr, /REQUESTS=13/);
 
     const beforeFailures = await readFile(pricePath);
     const rejectsRefresh = async (filename, source, message) => {

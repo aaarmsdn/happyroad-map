@@ -103,6 +103,21 @@ function areaBand(area) {
   return Math.abs(area - nearest) <= 6 ? String(nearest) : null;
 }
 
+async function fetchWithRetry(url) {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (response.ok || (response.status !== 429 && response.status < 500)) return response;
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+  }
+  throw lastError;
+}
+
 async function fetchMonth(serviceKey, regionCode, month) {
   const trades = [];
   let receivedItems = 0;
@@ -116,7 +131,7 @@ async function fetchMonth(serviceKey, regionCode, month) {
     url.searchParams.set("DEAL_YMD", month);
     url.searchParams.set("pageNo", String(page));
     url.searchParams.set("numOfRows", "1000");
-    const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    const response = await fetchWithRetry(url);
     if (!response.ok) throw new Error(`MOLIT ${regionCode}/${month}: HTTP ${response.status}`);
     const xml = await response.text();
     const resultCode = xmlValue(xml, "resultCode");
