@@ -35,7 +35,7 @@ jobs:
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
-            reason=$(printf '%s\n' "$output" | grep -E 'Error:' | tail -1)
+            reason=$(printf '%s\n' "$output" | grep -E 'Error:' | tail -1 || true)
             echo "::error::${reason:-Apartment price refresh failed.}"
             exit "$status"
           fi
