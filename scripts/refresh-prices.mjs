@@ -34,15 +34,6 @@ function normalizeName(value) {
     .replace(/아파트|주상복합|apt|\s|[-_.·]/g, "");
 }
 
-function likelySameName(left, right) {
-  const a = normalizeName(left).replace(/차$/, "");
-  const b = normalizeName(right).replace(/차$/, "");
-  let suffixLength = 0;
-  while (suffixLength < Math.min(a.length, b.length) && a.at(-suffixLength - 1) === b.at(-suffixLength - 1)) suffixLength += 1;
-  const suffix = a.slice(a.length - suffixLength);
-  return suffixLength >= 4 || (suffixLength >= 3 && /\d/.test(suffix));
-}
-
 function xmlValue(item, tag) {
   const match = item.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`));
   return match?.[1]?.trim()
@@ -72,7 +63,6 @@ function parseTrades(xml) {
       name: xmlValue(item, "aptNm"),
       area: Number(xmlValue(item, "excluUseAr")),
       amount: Number(xmlValue(item, "dealAmount").replaceAll(",", "")),
-      buildYear: xmlValue(item, "buildYear"),
       date: `${year}${month}${day}`
     };
   }).filter(trade => trade.name && trade.area > 0 && trade.amount > 0 && validTradeDate(trade.date));
@@ -180,12 +170,6 @@ const [apartments, prices, boundaries, nameAliases] = await Promise.all([
 const districts = prepareDistricts(boundaries);
 const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
 const regionByComplex = new Map(apartments.complexes.map(complex => [complex.id, regionCodeFor(complex, districts)]));
-const complexesByRegion = new Map();
-for (const complex of apartments.complexes) {
-  const regionCode = regionByComplex.get(complex.id);
-  if (!complexesByRegion.has(regionCode)) complexesByRegion.set(regionCode, []);
-  complexesByRegion.get(regionCode).push(complex);
-}
 const unmappedComplexes = [...regionByComplex.values()].filter(code => !code).length;
 const derivedRegionCodes = [...new Set([...regionByComplex.values()].filter(Boolean))].sort();
 const regionCodes = process.env.MOLIT_REGION_CODES
@@ -222,7 +206,6 @@ let skippedAmbiguous = 0;
 let skippedNoName = 0;
 let skippedRegionMismatch = 0;
 let matchedByAlias = 0;
-let matchedByValidatedName = 0;
 for (const trade of trades) {
   const band = areaBand(trade.area);
   if (!band) continue;
@@ -232,14 +215,6 @@ for (const trade of trades) {
   if (!regionIds.length) {
     regionIds = (idsByAlias.get(normalizeName(trade.name)) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
     if (regionIds.length) matchMethod = "configured_alias_and_lawd_cd_from_boundary";
-  }
-  if (!regionIds.length && /^\d{4}$/.test(trade.buildYear)) {
-    regionIds = (complexesByRegion.get(trade.regionCode) || [])
-      .filter(complex => complex.completed?.slice(0, 4) === trade.buildYear)
-      .filter(complex => complex.areaTags.includes(band))
-      .filter(complex => likelySameName(trade.name, complex.name))
-      .map(complex => complex.id);
-    if (regionIds.length) matchMethod = "validated_name_suffix_build_year_area_and_lawd_cd";
   }
   if (!regionIds.length) {
     if (ids.length) skippedRegionMismatch += 1;
@@ -251,7 +226,6 @@ for (const trade of trades) {
     continue;
   }
   if (matchMethod === "configured_alias_and_lawd_cd_from_boundary") matchedByAlias += 1;
-  if (matchMethod === "validated_name_suffix_build_year_area_and_lawd_cd") matchedByValidatedName += 1;
   if (!grouped.has(regionIds[0])) grouped.set(regionIds[0], []);
   grouped.get(regionIds[0]).push({ ...trade, band, matchMethod });
 }
@@ -263,9 +237,7 @@ for (const [complexId, complexTrades] of grouped) {
   record.matchStatus = "matched";
   record.matchMethod = complexTrades.some(trade => trade.matchMethod === "configured_alias_and_lawd_cd_from_boundary")
     ? "configured_alias_and_lawd_cd_from_boundary"
-    : complexTrades.some(trade => trade.matchMethod === "validated_name_suffix_build_year_area_and_lawd_cd")
-      ? "validated_name_suffix_build_year_area_and_lawd_cd"
-      : "normalized_name_and_lawd_cd_from_boundary";
+    : "normalized_name_and_lawd_cd_from_boundary";
   record.matchRegionCode = complexTrades[0].regionCode;
   record.matchedTradeCount = complexTrades.length;
   record.latestTradeDate = complexTrades.map(trade => trade.date).sort().at(-1);
@@ -289,8 +261,7 @@ prices.refresh = {
   skippedNoName,
   skippedRegionMismatch,
   skippedAmbiguous,
-  matchedByAlias,
-  matchedByValidatedName
+  matchedByAlias
 };
 apartments.areaTagsGeneratedAt = generatedAt;
 apartments.source.areaTagSource = "국토교통부 아파트 매매 실거래가 API";
