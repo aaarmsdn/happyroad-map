@@ -24,11 +24,13 @@ test("public app metadata does not identify a specific employer", async () => {
   assert.doesNotMatch(`${html}\n${manifest}\n${readme}\n${packageJson}`, /sk\s*(?:하이닉스|hynix)|hynix/i);
 });
 
-test("route preview keeps the current viewport and clears on map click", async () => {
+test("route preview survives map navigation and clears for apartment details", async () => {
   const appMain = await read("public/app-main.js");
   const showRoute = appMain.match(/function showRoute[\s\S]*?\n}\n\nfunction renderSearchResults/)?.[0] || "";
+  const openApartmentDetail = appMain.match(/function openApartmentDetail[\s\S]*?\r?\n}\r?\n\r?\nfunction showRoute/)?.[0] || "";
   assert.doesNotMatch(showRoute, /\.fitBounds\(|\.setView\(/);
-  assert.match(appMain, /map\.getContainer\(\)\.addEventListener\("pointerdown", clearRoute, true\)/);
+  assert.doesNotMatch(appMain, /addEventListener\("pointerdown", clearRoute/);
+  assert.match(openApartmentDetail, /clearRoute\(\)/);
 });
 
 test("pending prices cannot reach apartment details", () => {

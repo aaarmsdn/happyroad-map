@@ -131,6 +131,7 @@ function openStopDetail(stop) {
 }
 
 function openApartmentDetail(complex, nearestLink = linksByComplex.get(complex.id)?.[0]) {
+  clearRoute();
   openDetail(apartmentDetailHtml({
     complex, nearestLink,
     relatedLinks: (linksByComplex.get(complex.id) || []).slice().sort((a, b) => a.distanceKm - b.distanceKm),
@@ -227,7 +228,6 @@ async function initialize() {
   apartmentLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
   locationLayer = L.layerGroup().addTo(map);
-  map.getContainer().addEventListener("pointerdown", clearRoute, true);
   map.on("moveend", () => renderMap(false));
   populateFilters();
   syncControls();
