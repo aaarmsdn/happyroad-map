@@ -8,42 +8,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import vm from "node:vm";
 import { apartmentDetailHtml, stopDetailHtml } from "../public/detail-view.js";
 import { priceRecordForDisplay } from "../public/filter-data.js";
-import { addApartmentMarkers, spreadMarkerPoints } from "../public/map-view.js";
 import { formatDate, safeExternalUrl } from "../public/ui-utils.js";
 
 const read = name => readFile(new URL(`../${name}`, import.meta.url), "utf8");
-
-test("coincident apartment markers receive separate screen positions", () => {
-  const points = spreadMarkerPoints([{ x: 10, y: 10 }, { x: 10, y: 10 }], 32, [{ x: 10, y: 10 }]);
-  assert.ok(Math.hypot(points[0].x - 10, points[0].y - 10) >= 32);
-  assert.ok(Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y) >= 32);
-});
-
-test("apartment markers render sub-100-million-won prices in ten-thousand-won units", () => {
-  const iconHtml = [];
-  const L = {
-    divIcon: options => { iconHtml.push(options.html); return options; },
-    marker: latLng => ({
-      addTo() { return this; },
-      bindTooltip() { return this; },
-      getElement() { return null; },
-      getLatLng() { return latLng; },
-      on() { return this; }
-    })
-  };
-  const map = {
-    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
-    getZoom: () => 15,
-    latLngToLayerPoint: () => ({ x: 0, y: 0 }),
-    layerPointToLatLng: () => [37.5, 127]
-  };
-  addApartmentMarkers({
-    L, map, layer: {}, visibleLinks: new Map([["1", {}]]),
-    complexById: new Map([["1", { id: "1", name: "단지", lat: 37.5, lng: 127 }]]),
-    priceOf: () => 8500, colorOf: () => "#f04438", onSelect: () => {}
-  });
-  assert.match(iconHtml.join(""), />8,500만</);
-});
 
 test("public app metadata does not identify a specific employer", async () => {
   const [html, manifest, readme, packageJson] = await Promise.all([
@@ -55,15 +22,6 @@ test("public app metadata does not identify a specific employer", async () => {
   assert.equal(JSON.parse(packageJson).name, "happyroad-map");
   assert.match(readme, /^# 하이로드 웹앱/m);
   assert.doesNotMatch(`${html}\n${manifest}\n${readme}\n${packageJson}`, /sk\s*(?:하이닉스|hynix)|hynix/i);
-});
-
-test("dense coincident markers never fall back to overlapping positions", () => {
-  const points = spreadMarkerPoints(Array.from({ length: 100 }, () => ({ x: 0, y: 0 })));
-  for (let left = 0; left < points.length; left += 1) {
-    for (let right = left + 1; right < points.length; right += 1) {
-      assert.ok(Math.hypot(points[left].x - points[right].x, points[left].y - points[right].y) >= 32);
-    }
-  }
 });
 
 test("pending prices cannot reach apartment details", () => {

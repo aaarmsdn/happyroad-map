@@ -13,6 +13,12 @@ export function filteredEntries(entries, state) {
   return entries.filter(entry => entryMatches(entry, state) && (state.route === "전체" || entry.routeName === state.route));
 }
 
+export function routeRequestForStop(stop, paths, state) {
+  const pathKeys = new Set(paths.map(path => path.uidKey));
+  const entry = filteredEntries(stop.entries, state).find(item => pathKeys.has(item.uidKey));
+  return entry ? { uidKey: entry.uidKey, routeName: entry.routeName } : null;
+}
+
 export function matchingApartmentLinks(links, state, routeNames, complexById) {
   const result = new Map();
   for (const link of links) {

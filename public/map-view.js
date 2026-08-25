@@ -105,12 +105,19 @@ export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
   if (map.getZoom() < 14) {
     const cellSize = 0.0125 * 2 ** (13 - map.getZoom());
     const clusters = clusterItems(stops, stop => [stop.lat, stop.lng], cellSize);
-    const markerPoints = spreadMarkerPoints(clusters.map(cluster => map.latLngToLayerPoint([cluster.lat, cluster.lng])), 42);
-    for (const [index, cluster] of clusters.entries()) {
-      const markerLatLng = map.layerPointToLatLng(markerPoints[index]);
+    const singletonPoints = clusters
+      .filter(cluster => cluster.items.length === 1)
+      .map(cluster => map.latLngToLayerPoint([cluster.items[0].lat, cluster.items[0].lng]));
+    const summaryPoints = spreadMarkerPoints(
+      clusters.filter(cluster => cluster.items.length > 1).map(cluster => map.latLngToLayerPoint([cluster.lat, cluster.lng])),
+      42,
+      singletonPoints
+    );
+    let summaryIndex = 0;
+    for (const cluster of clusters) {
       if (cluster.items.length > 1) {
         const size = Math.min(42, 25 + Math.log2(cluster.items.length) * 3);
-        const marker = L.marker(markerLatLng, { icon: markerIcon(L, `<span class="map-cluster stop-cluster" style="--cluster-size:${size}px"><i data-lucide="bus-front"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 100 });
+        const marker = L.marker(map.layerPointToLatLng(summaryPoints[summaryIndex++]), { icon: markerIcon(L, `<span class="map-cluster stop-cluster" style="--cluster-size:${size}px"><i data-lucide="bus-front"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 100 });
         marker.bindTooltip(`정류장 ${cluster.items.length.toLocaleString("ko-KR")}개`, { direction: "top" });
         marker.on("click", () => map.setView([cluster.lat, cluster.lng], Math.min(14, map.getZoom() + 2)));
         addAccessibleMarker(marker, layer, `정류장 ${cluster.items.length.toLocaleString("ko-KR")}개`);
@@ -118,7 +125,7 @@ export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
         continue;
       }
       const stop = cluster.items[0];
-      const marker = L.marker(markerLatLng, { icon: stopIcon(L, stop), zIndexOffset: 100 });
+      const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon(L, stop), zIndexOffset: 300 });
       marker.bindTooltip(escapeHtml(stop.name), { direction: "top" });
       marker.on("click", () => onSelect(stop));
       addAccessibleMarker(marker, layer, stop.name);
@@ -126,9 +133,8 @@ export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
     }
     return renderedPoints;
   }
-  const markerPoints = spreadMarkerPoints(stops.map(stop => map.latLngToLayerPoint([stop.lat, stop.lng])));
-  stops.forEach((stop, index) => {
-    const marker = L.marker(map.layerPointToLatLng(markerPoints[index]), { icon: stopIcon(L, stop), zIndexOffset: 100 });
+  stops.forEach(stop => {
+    const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon(L, stop), zIndexOffset: 300 });
     marker.bindTooltip(`${escapeHtml(stop.name)} · ${new Set(stop.entries.map(entry => entry.routeName)).size}개 노선`, { direction: "top" });
     marker.on("click", () => onSelect(stop));
     addAccessibleMarker(marker, layer, stop.name);
@@ -145,32 +151,38 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
   if (map.getZoom() < 14) {
     const cellSize = 0.05 * 2 ** (11 - map.getZoom());
     const clusters = clusterItems(items, item => [item.complex.lat, item.complex.lng], cellSize);
-    const markerPoints = spreadMarkerPoints(clusters.map(cluster => map.latLngToLayerPoint([cluster.lat, cluster.lng])), 68, occupiedPoints);
-    for (const [index, cluster] of clusters.entries()) {
-      const markerLatLng = map.layerPointToLatLng(markerPoints[index]);
+    const singletonPoints = clusters
+      .filter(cluster => cluster.items.length === 1)
+      .map(cluster => map.latLngToLayerPoint([cluster.items[0].complex.lat, cluster.items[0].complex.lng]));
+    const summaryPoints = spreadMarkerPoints(
+      clusters.filter(cluster => cluster.items.length > 1).map(cluster => map.latLngToLayerPoint([cluster.lat, cluster.lng])),
+      68,
+      [...occupiedPoints, ...singletonPoints]
+    );
+    let summaryIndex = 0;
+    for (const cluster of clusters) {
       const single = cluster.items.length === 1 ? cluster.items[0] : null;
       if (!single) {
         const size = Math.min(42, 25 + Math.log2(cluster.items.length) * 3);
-        const marker = L.marker(markerLatLng, { icon: markerIcon(L, `<span class="map-cluster apartment-cluster" style="--cluster-size:${size}px"><i data-lucide="building-2"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 200 });
+        const marker = L.marker(map.layerPointToLatLng(summaryPoints[summaryIndex++]), { icon: markerIcon(L, `<span class="map-cluster apartment-cluster" style="--cluster-size:${size}px"><i data-lucide="building-2"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 200 });
         marker.bindTooltip(`아파트 ${cluster.items.length.toLocaleString("ko-KR")}단지`, { direction: "top" });
         marker.on("click", () => map.setView([cluster.lat, cluster.lng], Math.min(14, map.getZoom() + 2)));
         addAccessibleMarker(marker, layer, `아파트 ${cluster.items.length.toLocaleString("ko-KR")}단지`);
         continue;
       }
       const median = priceOf(single.complex.id);
-      const marker = L.marker(markerLatLng, { icon: apartmentPriceIcon(L, median, colorOf(median)), zIndexOffset: 200 });
+      const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, median, colorOf(median)), zIndexOffset: 200 });
       marker.bindTooltip(`${escapeHtml(single.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}`, { direction: "top" });
       marker.on("click", () => onSelect(single.complex, single.link));
       addAccessibleMarker(marker, layer, single.complex.name);
     }
     return;
   }
-  const markerPoints = spreadMarkerPoints(items.map(item => map.latLngToLayerPoint([item.complex.lat, item.complex.lng])), 68, occupiedPoints);
-  items.forEach((item, index) => {
+  items.forEach(item => {
     const median = priceOf(item.complex.id);
     const color = colorOf(median);
     const icon = apartmentPriceIcon(L, median, color);
-    const marker = L.marker(map.layerPointToLatLng(markerPoints[index]), { icon, zIndexOffset: 200 });
+    const marker = L.marker([item.complex.lat, item.complex.lng], { icon, zIndexOffset: 200 });
     marker.bindTooltip(`${escapeHtml(item.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}`, { direction: "top" });
     marker.on("click", () => onSelect(item.complex, item.link));
     addAccessibleMarker(marker, layer, item.complex.name);

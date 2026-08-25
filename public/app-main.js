@@ -1,8 +1,8 @@
 import { bindEvents } from "./app-events.js?v=14";
 import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=16";
-import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, priceRecordForDisplay } from "./filter-data.js?v=16";
+import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=18";
 import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "./filter-logic.js?v=7";
-import { addApartmentMarkers, addStopMarkers, decodePolyline, groupStops } from "./map-view.js?v=23";
+import { addApartmentMarkers, addStopMarkers, decodePolyline, groupStops } from "./map-view.js?v=26";
 import { searchResults, searchResultsHtml } from "./search-view.js?v=10";
 import { escapeHtml, formatDate } from "./ui-utils.js?v=10";
 
@@ -120,6 +120,8 @@ function closeDetail() {
 
 function openStopDetail(stop) {
   openDetail(stopDetailHtml(stop));
+  const route = routeRequestForStop(stop, shuttle.paths, state);
+  if (route) showRoute(route);
 }
 
 function openApartmentDetail(complex, nearestLink = linksByComplex.get(complex.id)?.[0]) {
