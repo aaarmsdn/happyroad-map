@@ -50,7 +50,7 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
   try {
     const result = await new Promise(resolve => {
       const child = spawn(process.execPath, ["--import", pathToFileURL(preloadPath).href, path.join(tempDir, "scripts", "refresh-prices.mjs")], {
-        env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11215", MOLIT_MONTHS: "12" }
+        env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11215", MOLIT_MONTHS: "12", MOLIT_RETRY_DELAY_MS: "0" }
       });
       let stderr = "";
       child.stderr.on("data", chunk => { stderr += chunk; });

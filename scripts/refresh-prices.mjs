@@ -105,7 +105,8 @@ function areaBand(area) {
 
 async function fetchWithRetry(url) {
   let lastError;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  const retryDelay = process.env.MOLIT_RETRY_DELAY_MS === undefined ? 5000 : Math.max(0, Number(process.env.MOLIT_RETRY_DELAY_MS));
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(30000) });
       if (response.ok || (response.status !== 429 && response.status < 500)) return response;
@@ -113,7 +114,7 @@ async function fetchWithRetry(url) {
     } catch (error) {
       lastError = error;
     }
-    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+    if (attempt < 6) await new Promise(resolve => setTimeout(resolve, retryDelay * Math.min(2 ** (attempt - 1), 6)));
   }
   throw lastError;
 }
