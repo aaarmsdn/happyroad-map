@@ -28,7 +28,7 @@ test("route preview keeps the current viewport and clears on map click", async (
   const appMain = await read("public/app-main.js");
   const showRoute = appMain.match(/function showRoute[\s\S]*?\n}\n\nfunction renderSearchResults/)?.[0] || "";
   assert.doesNotMatch(showRoute, /\.fitBounds\(|\.setView\(/);
-  assert.match(appMain, /map\.on\("click", \(\) => routeLayer\.clearLayers\(\)\)/);
+  assert.match(appMain, /map\.getContainer\(\)\.addEventListener\("pointerdown", clearRoute, true\)/);
 });
 
 test("pending prices cannot reach apartment details", () => {

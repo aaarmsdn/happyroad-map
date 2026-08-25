@@ -210,3 +210,15 @@ export function decodePolyline(encoded) {
   }
   return points;
 }
+
+export function addRoutePaths({ L, layer, paths }) {
+  let rendered = 0;
+  for (const path of paths) {
+    const points = decodePolyline(path.encoded);
+    if (!points.length) continue;
+    L.polyline(points, { color: "#ffffff", weight: 10, opacity: 0.94, interactive: false }).addTo(layer);
+    L.polyline(points, { color: "#7d4cc2", weight: 6, opacity: 1, interactive: false }).addTo(layer);
+    rendered += 1;
+  }
+  return rendered;
+}

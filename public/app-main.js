@@ -2,7 +2,7 @@ import { bindEvents } from "./app-events.js?v=14";
 import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=18";
 import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, pricePerPyeongFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=21";
 import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "./filter-logic.js?v=7";
-import { addApartmentMarkers, addStopMarkers, decodePolyline, groupStops } from "./map-view.js?v=27";
+import { addApartmentMarkers, addRoutePaths, addStopMarkers, groupStops } from "./map-view.js?v=29";
 import { searchResults, searchResultsHtml } from "./search-view.js?v=10";
 import { escapeHtml, formatDate } from "./ui-utils.js?v=10";
 
@@ -67,8 +67,13 @@ function updateRouteOptions() {
   $("#routeSelect").value = state.route;
 }
 
-function renderMap(clearRoute = true) {
-  if (clearRoute) routeLayer?.clearLayers();
+function clearRoute() {
+  routeLayer?.clearLayers();
+  $("#map").dataset.routeVisible = "false";
+}
+
+function renderMap(clearRouteLayer = true) {
+  if (clearRouteLayer) clearRoute();
   updateRouteOptions();
   const entries = filteredEntries(shuttle.entries, state);
   const stops = groupStops(entries);
@@ -136,12 +141,9 @@ function openApartmentDetail(complex, nearestLink = linksByComplex.get(complex.i
 function showRoute({ uidKey, routeName }) {
   const paths = shuttle.paths.filter(path => uidKey ? path.uidKey === uidKey : path.routeName === routeName);
   if (!paths.length) return showToast("이 노선의 경로 정보가 없습니다.");
-  routeLayer.clearLayers();
-  for (const path of paths.slice(0, uidKey ? 1 : 4)) {
-    const points = decodePolyline(path.encoded);
-    if (!points.length) continue;
-    L.polyline(points, { color: "#f04438", weight: 5, opacity: 0.86 }).addTo(routeLayer);
-  }
+  clearRoute();
+  const rendered = addRoutePaths({ L, layer: routeLayer, paths: paths.slice(0, uidKey ? 1 : 4) });
+  $("#map").dataset.routeVisible = String(rendered > 0);
   showToast(`${paths[0].routeName} 경로 표시`);
 }
 
@@ -225,7 +227,7 @@ async function initialize() {
   apartmentLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
   locationLayer = L.layerGroup().addTo(map);
-  map.on("click", () => routeLayer.clearLayers());
+  map.getContainer().addEventListener("pointerdown", clearRoute, true);
   map.on("moveend", () => renderMap(false));
   populateFilters();
   syncControls();

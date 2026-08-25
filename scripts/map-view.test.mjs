@@ -1,7 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { routeRequestForStop } from "../public/filter-data.js";
-import { addApartmentMarkers, addStopMarkers, spreadMarkerPoints } from "../public/map-view.js";
+import { addApartmentMarkers, addRoutePaths, addStopMarkers, spreadMarkerPoints } from "../public/map-view.js";
+
+test("route paths render with a visible halo and highlight without map movement", () => {
+  const lines = [];
+  const layer = {};
+  const L = {
+    polyline: (points, options) => ({ addTo(target) { lines.push({ points, options, target }); } })
+  };
+  const rendered = addRoutePaths({ L, layer, paths: [{ encoded: "_p~iF~ps|U_ulLnnqC_mqNvxq`@" }] });
+  assert.equal(rendered, 1);
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0].target, layer);
+  assert.deepEqual(lines.map(line => [line.options.color, line.options.weight]), [["#ffffff", 10], ["#7d4cc2", 6]]);
+  assert.ok(lines.every(line => line.options.interactive === false));
+});
 
 test("coincident cluster summaries receive separate screen positions", () => {
   const points = spreadMarkerPoints([{ x: 10, y: 10 }, { x: 10, y: 10 }], 32, [{ x: 10, y: 10 }]);
