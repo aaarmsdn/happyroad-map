@@ -6,7 +6,7 @@
 
 - 개인 PC 서버: 필요 없음
 - 웹 호스팅: 공개 저장소의 GitHub Pages 사용
-- 정기 실행: GitHub Actions 주 1회 사용
+- 정기 실행: GitHub Actions 매일 사용
 - 가격 원본: 공공데이터포털 국토교통부 아파트 매매 실거래가 API
 - 데이터베이스: 사용하지 않음. 큰 정적 JSON을 그대로 배포해 운영 구성을 줄임
 
@@ -25,7 +25,7 @@ npm start
 
 1. [공공데이터포털 국토교통부 아파트 매매 실거래가 상세 자료](https://www.data.go.kr/data/15126468/openapi.do?recommendDataYn=Y)에서 활용 신청 후 일반 인증키를 받습니다. Encoding/Decoding 키 모두 처리합니다.
 2. GitHub 저장소 `Settings > Secrets and variables > Actions`에 `MOLIT_API_KEY`를 등록합니다.
-3. `.github/workflows/refresh-prices.yml`이 최근 12개월 거래를 매주 화요일 04:17(KST)에 갱신하고 변경 파일을 커밋합니다.
+3. `.github/workflows/refresh-prices.yml`이 최근 12개월 거래를 매일 04:17(KST)에 갱신하고 변경 파일을 커밋합니다.
 
 `config/sgg.json`의 시군구 경계로 각 아파트 좌표의 5자리 `LAWD_CD`를 계산합니다. 국토부 거래와 단지 좌표의 지역 코드가 같고 정규화한 이름이 하나로 일치할 때 갱신합니다. 동 이름이 붙거나 `차` 표기가 다른 경우에는 시군구·준공연도·전용면적 구간·단지명 꼬리가 모두 일치하는 유일한 후보만 자동 연결합니다. 명시적인 예외는 `config/price-name-aliases.json`에 등록하며, 후보가 둘 이상이면 잘못 연결하지 않고 건너뜁니다. 네이버는 현재 매물을 확인하는 외부 링크만 제공하며, 호가·매물 스냅샷을 저장하거나 비공식 API를 호출하지 않습니다.
 

@@ -1,10 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises";
+import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const endpoint = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev";
+dns.setDefaultResultOrder("ipv4first");
 
 function usage() {
   console.log(`Usage: npm run prices:refresh
