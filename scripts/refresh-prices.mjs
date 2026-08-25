@@ -231,6 +231,20 @@ for (const trade of trades) {
 }
 if (!grouped.size) throw new Error("MOLIT trades matched no configured apartment; existing prices were preserved.");
 
+const refreshedRegions = new Set(regionCodes);
+for (const [complexId, record] of Object.entries(prices.complexes)) {
+  if (record.matchStatus !== "matched" || !refreshedRegions.has(record.matchRegionCode) || grouped.has(complexId)) continue;
+  prices.complexes[complexId] = {
+    matchStatus: "pending",
+    matchMethod: null,
+    matchRegionCode: null,
+    matchedTradeCount: 0,
+    latestTradeDate: null,
+    source: "국토교통부 아파트 매매 실거래가 API",
+    areas: Object.fromEntries(["59", "84", "102", "115"].map(band => [band, summarize([])]))
+  };
+}
+
 for (const [complexId, complexTrades] of grouped) {
   const complex = complexById.get(complexId);
   const record = prices.complexes[complexId] || {};

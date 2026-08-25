@@ -28,7 +28,18 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
         { id: "99", name: "자양현대7차", lat: 37.53639, lng: 127.074589, areaTags: ["84"] }
       ]
     })),
-    writeFile(pricePath, JSON.stringify({ complexes: {} })),
+    writeFile(pricePath, JSON.stringify({ complexes: {
+      "98": {
+        matchStatus: "matched",
+        matchMethod: "configured_alias_and_lawd_cd_from_boundary",
+        matchRegionCode: "11215",
+        matchedTradeCount: 1,
+        latestTradeDate: "20250101",
+        source: "국토교통부 아파트 매매 실거래가 API",
+        medianPerPyeong: 9999,
+        areas: { "84": { count: 1, median: 99999, medianPerPyeong: 9999 } }
+      }
+    } })),
     writeFile(path.join(tempDir, "config", "price-name-aliases.json"), JSON.stringify({
       "97": ["자양우성7"], "98": ["자양현대7"], "99": ["자양현대7"]
     }))
@@ -60,7 +71,9 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
     assert.equal(prices.complexes["97"].medianPerPyeong, 4938);
     assert.equal(prices.complexes["97"].areas["115"].median, 165000);
     assert.equal(prices.complexes["97"].areas["115"].medianPerPyeong, 4938);
-    assert.equal(prices.complexes["98"], undefined);
+    assert.equal(prices.complexes["98"].matchStatus, "pending");
+    assert.equal(prices.complexes["98"].matchMethod, null);
+    assert.equal(prices.complexes["98"].medianPerPyeong, undefined);
     assert.equal(prices.complexes["99"], undefined);
     assert.equal(prices.refresh.skippedAmbiguous, 12);
     const months = result.stderr.match(/FETCH_MONTHS=([^\r\n]+)/)?.[1].split(",") || [];
