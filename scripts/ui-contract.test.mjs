@@ -24,6 +24,13 @@ test("public app metadata does not identify a specific employer", async () => {
   assert.doesNotMatch(`${html}\n${manifest}\n${readme}\n${packageJson}`, /sk\s*(?:하이닉스|hynix)|hynix/i);
 });
 
+test("route preview keeps the current viewport and clears on map click", async () => {
+  const appMain = await read("public/app-main.js");
+  const showRoute = appMain.match(/function showRoute[\s\S]*?\n}\n\nfunction renderSearchResults/)?.[0] || "";
+  assert.doesNotMatch(showRoute, /\.fitBounds\(|\.setView\(/);
+  assert.match(appMain, /map\.on\("click", \(\) => routeLayer\.clearLayers\(\)\)/);
+});
+
 test("pending prices cannot reach apartment details", () => {
   const record = { matchStatus: "pending", matchMethod: "legacy", matchRegionCode: null, areas: { "84": { count: 1, median: 100000 } } };
   assert.equal(priceRecordForDisplay({ complexes: { "1": record } }, "1", "11200"), null);

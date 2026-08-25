@@ -137,14 +137,11 @@ function showRoute({ uidKey, routeName }) {
   const paths = shuttle.paths.filter(path => uidKey ? path.uidKey === uidKey : path.routeName === routeName);
   if (!paths.length) return showToast("이 노선의 경로 정보가 없습니다.");
   routeLayer.clearLayers();
-  const bounds = [];
   for (const path of paths.slice(0, uidKey ? 1 : 4)) {
     const points = decodePolyline(path.encoded);
     if (!points.length) continue;
     L.polyline(points, { color: "#f04438", weight: 5, opacity: 0.86 }).addTo(routeLayer);
-    bounds.push(...points);
   }
-  if (bounds.length) map.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 });
   showToast(`${paths[0].routeName} 경로 표시`);
 }
 
@@ -228,6 +225,7 @@ async function initialize() {
   apartmentLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
   locationLayer = L.layerGroup().addTo(map);
+  map.on("click", () => routeLayer.clearLayers());
   map.on("moveend", () => renderMap(false));
   populateFilters();
   syncControls();
