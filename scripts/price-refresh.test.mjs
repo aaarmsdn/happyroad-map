@@ -104,6 +104,7 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\`));`
   const item = new URL(url).searchParams.get("pageNo") === "1" ? ${JSON.stringify(item("165,000"))} : "";
   return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>2</totalCount><items>\${item}</items></body></response>\`, { status: 200 });
 };`, /pagination ended before totalCount/);
+    await rejectsRefresh("molit-malformed.mjs", `globalThis.fetch = async () => new Response(${JSON.stringify("<response><header><resultCode>000</resultCode></header><body><totalCount>1</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount></dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item></items></body></response>")}, { status: 200 });`, /malformed trade item/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

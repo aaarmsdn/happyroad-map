@@ -118,7 +118,9 @@ async function fetchMonth(serviceKey, regionCode, month) {
     const pageItems = rawItems.join("");
     if (rawItemCount && seenPageItems.has(pageItems)) throw new Error(`MOLIT ${regionCode}/${month}: repeated pagination page`);
     if (rawItemCount) seenPageItems.add(pageItems);
-    const pageTrades = parseTrades(xml).map(trade => ({ ...trade, regionCode }));
+    const parsedTrades = parseTrades(xml);
+    if (parsedTrades.length !== rawItemCount) throw new Error(`MOLIT ${regionCode}/${month}: malformed trade item`);
+    const pageTrades = parsedTrades.map(trade => ({ ...trade, regionCode }));
     trades.push(...pageTrades);
     receivedItems += rawItemCount;
     const total = Number(totalValue);
