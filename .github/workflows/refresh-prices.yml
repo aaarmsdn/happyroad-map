@@ -24,7 +24,21 @@ jobs:
         env:
           MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
           MOLIT_MONTHS: "12"
-        run: npm run prices:refresh
+        run: |
+          if [ -z "$MOLIT_API_KEY" ]; then
+            echo "::error::MOLIT_API_KEY repository secret is missing."
+            exit 1
+          fi
+          set +e
+          output=$(npm run prices:refresh 2>&1)
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            reason=$(printf '%s\n' "$output" | grep -E 'Error:' | tail -1)
+            echo "::error::${reason:-Apartment price refresh failed.}"
+            exit "$status"
+          fi
+          printf '%s\n' "$output"
       - name: Validate generated data
         run: npm run check
       - name: Commit changed prices
