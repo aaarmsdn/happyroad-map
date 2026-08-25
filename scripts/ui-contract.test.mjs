@@ -26,8 +26,10 @@ test("public app metadata does not identify a specific employer", async () => {
 
 test("route preview survives map navigation and clears for apartment details", async () => {
   const appMain = await read("public/app-main.js");
+  const renderMap = appMain.match(/function renderMap[\s\S]*?\r?\n}\r?\n\r?\nfunction openDetail/)?.[0] || "";
   const showRoute = appMain.match(/function showRoute[\s\S]*?\n}\n\nfunction renderSearchResults/)?.[0] || "";
   const openApartmentDetail = appMain.match(/function openApartmentDetail[\s\S]*?\r?\n}\r?\n\r?\nfunction showRoute/)?.[0] || "";
+  assert.doesNotMatch(renderMap, /clearRoute\(\)/);
   assert.doesNotMatch(showRoute, /\.fitBounds\(|\.setView\(/);
   assert.doesNotMatch(appMain, /addEventListener\("pointerdown", clearRoute/);
   assert.match(openApartmentDetail, /clearRoute\(\)/);

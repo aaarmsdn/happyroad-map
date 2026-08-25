@@ -72,8 +72,7 @@ function clearRoute() {
   $("#map").dataset.routeVisible = "false";
 }
 
-function renderMap(clearRouteLayer = true) {
-  if (clearRouteLayer) clearRoute();
+function renderMap() {
   updateRouteOptions();
   const entries = filteredEntries(shuttle.entries, state);
   const stops = groupStops(entries);
@@ -228,7 +227,7 @@ async function initialize() {
   apartmentLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
   locationLayer = L.layerGroup().addTo(map);
-  map.on("moveend", () => renderMap(false));
+  map.on("moveend", renderMap);
   populateFilters();
   syncControls();
   bindEvents({ state, syncControls, renderMap, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail });
