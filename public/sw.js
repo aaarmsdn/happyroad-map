@@ -1,14 +1,14 @@
-const CACHE = "happyroad-v63";
+const CACHE = "happyroad-v64";
 const SHELL = [
   "./",
   "./index.html",
   "./styles.css?v=16",
-  "./app-main.js?v=55",
+  "./app-main.js?v=56",
   "./app-events.js?v=14",
-  "./detail-view.js?v=18",
+  "./detail-view.js?v=19",
   "./filter-data.js?v=22",
   "./filter-logic.js?v=7",
-  "./map-view.js?v=30",
+  "./map-view.js?v=31",
   "./search-view.js?v=10",
   "./ui-utils.js?v=10",
   "./manifest.webmanifest",

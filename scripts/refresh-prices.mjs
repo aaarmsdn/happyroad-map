@@ -227,7 +227,6 @@ let matchedByUniqueContainment = 0;
 const inferredIdsByTradeName = new Map();
 for (const trade of trades) {
   const band = areaBand(trade.area);
-  if (!band) continue;
   const ids = idsByName.get(normalizeName(trade.name)) || [];
   let regionIds = ids.filter(id => regionByComplex.get(id) === trade.regionCode);
   let matchMethod = "normalized_name_and_lawd_cd_from_boundary";

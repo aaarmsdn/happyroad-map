@@ -238,6 +238,31 @@ test("apartment markers render sub-100-million-won prices in ten-thousand-won un
   assert.deepEqual(colorInputs, [3306]);
 });
 
+test("apartment markers expose per-pyeong prices when selected areas have no trades", () => {
+  const tooltips = [];
+  const L = {
+    divIcon: options => options,
+    marker: latLng => ({
+      addTo() { return this; },
+      bindTooltip(label) { tooltips.push(label); return this; },
+      getElement() { return null; },
+      getLatLng() { return latLng; },
+      on() { return this; }
+    })
+  };
+  const map = {
+    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
+    getZoom: () => 15,
+    latLngToLayerPoint: () => ({ x: 0, y: 0 })
+  };
+  addApartmentMarkers({
+    L, map, layer: {}, visibleLinks: new Map([["1", {}]]),
+    complexById: new Map([["1", { id: "1", name: "단지", lat: 37.5, lng: 127 }]]),
+    priceOf: () => null, perPyeongOf: () => 4474, colorOf: () => "#d6a01d", onSelect: () => {}
+  });
+  assert.equal(tooltips[0], "단지 · 평당 4,474만");
+});
+
 test("dense coincident cluster summaries never overlap", () => {
   const points = spreadMarkerPoints(Array.from({ length: 100 }, () => ({ x: 0, y: 0 })));
   for (let left = 0; left < points.length; left += 1) {

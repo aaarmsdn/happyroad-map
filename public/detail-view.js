@@ -1,5 +1,5 @@
 import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
-import { pricePerPyeong } from "./filter-data.js?v=21";
+import { pricePerPyeong } from "./filter-data.js?v=22";
 
 export function stopDetailHtml(stop) {
   const variants = [...new Map(stop.entries.map(entry => [entry.uidKey, entry])).values()]

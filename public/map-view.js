@@ -171,7 +171,7 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
       const median = priceOf(single.complex.id);
       const perPyeong = perPyeongOf(single.complex.id);
       const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, median, colorOf(perPyeong)), zIndexOffset: 200 });
-      marker.bindTooltip(`${escapeHtml(single.complex.name)}${median ? ` · ${formatPrice(median)}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}` : ""}`, { direction: "top" });
+      marker.bindTooltip(`${escapeHtml(single.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}`, { direction: "top" });
       marker.on("click", () => onSelect(single.complex, single.link));
       addAccessibleMarker(marker, layer, single.complex.name);
     }
@@ -183,7 +183,7 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
     const color = colorOf(perPyeong);
     const icon = apartmentPriceIcon(L, median, color);
     const marker = L.marker([item.complex.lat, item.complex.lng], { icon, zIndexOffset: 200 });
-    marker.bindTooltip(`${escapeHtml(item.complex.name)}${median ? ` · ${formatPrice(median)}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}` : ""}`, { direction: "top" });
+    marker.bindTooltip(`${escapeHtml(item.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}`, { direction: "top" });
     marker.on("click", () => onSelect(item.complex, item.link));
     addAccessibleMarker(marker, layer, item.complex.name);
   });
