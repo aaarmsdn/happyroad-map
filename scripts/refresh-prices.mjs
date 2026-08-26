@@ -218,13 +218,44 @@ for (const regionCode of regionCodes) {
 }
 if (!trades.length) throw new Error("MOLIT returned no valid trades; existing prices were preserved.");
 
+const inferredIdsByTradeName = new Map();
+const inferredTradeNamesByComplex = new Map();
+for (const trade of trades) {
+  const normalizedTradeName = normalizeName(trade.name);
+  const cacheKey = `${trade.regionCode}:${normalizedTradeName}`;
+  if (inferredIdsByTradeName.has(cacheKey)) continue;
+  const exactIds = (idsByName.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
+  const aliasIds = (idsByAlias.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
+  if (exactIds.length || aliasIds.length) continue;
+  const tradeName = comparableName(trade.name);
+  const tradeNumbers = numberSignature(trade.name);
+  const candidates = (complexesByRegion.get(trade.regionCode) || []).filter(complex => {
+    const complexName = comparableName(complex.name);
+    return Math.min(tradeName.length, complexName.length) >= 4
+      && numberSignature(complex.name) === tradeNumbers
+      && (tradeName.includes(complexName) || complexName.includes(tradeName));
+  });
+  const ids = candidates.length === 1 ? [candidates[0].id] : [];
+  inferredIdsByTradeName.set(cacheKey, ids);
+  if (ids.length) {
+    if (!inferredTradeNamesByComplex.has(ids[0])) inferredTradeNamesByComplex.set(ids[0], new Set());
+    inferredTradeNamesByComplex.get(ids[0]).add(normalizedTradeName);
+  }
+}
+const collidingInferredKeys = new Set();
+for (const [cacheKey, ids] of inferredIdsByTradeName) {
+  if (ids.length && inferredTradeNamesByComplex.get(ids[0]).size > 1) {
+    inferredIdsByTradeName.set(cacheKey, []);
+    collidingInferredKeys.add(cacheKey);
+  }
+}
+
 const grouped = new Map();
 let skippedAmbiguous = 0;
 let skippedNoName = 0;
 let skippedRegionMismatch = 0;
 let matchedByAlias = 0;
 let matchedByUniqueContainment = 0;
-const inferredIdsByTradeName = new Map();
 for (const trade of trades) {
   const band = areaBand(trade.area);
   const ids = idsByName.get(normalizeName(trade.name)) || [];
@@ -236,19 +267,12 @@ for (const trade of trades) {
   }
   if (!regionIds.length) {
     const cacheKey = `${trade.regionCode}:${normalizeName(trade.name)}`;
-    if (!inferredIdsByTradeName.has(cacheKey)) {
-      const tradeName = comparableName(trade.name);
-      const tradeNumbers = numberSignature(trade.name);
-      const candidates = (complexesByRegion.get(trade.regionCode) || []).filter(complex => {
-        const complexName = comparableName(complex.name);
-        return Math.min(tradeName.length, complexName.length) >= 4
-          && numberSignature(complex.name) === tradeNumbers
-          && (tradeName.includes(complexName) || complexName.includes(tradeName));
-      });
-      inferredIdsByTradeName.set(cacheKey, candidates.length === 1 ? [candidates[0].id] : []);
-    }
-    regionIds = inferredIdsByTradeName.get(cacheKey);
+    regionIds = inferredIdsByTradeName.get(cacheKey) || [];
     if (regionIds.length) matchMethod = "unique_containment_name_and_lawd_cd_from_boundary";
+    else if (collidingInferredKeys.has(cacheKey)) {
+      skippedAmbiguous += 1;
+      continue;
+    }
   }
   if (!regionIds.length) {
     if (ids.length) skippedRegionMismatch += 1;
@@ -294,6 +318,7 @@ for (const [complexId, complexTrades] of grouped) {
   record.matchedTradeCount = complexTrades.length;
   record.latestTradeDate = complexTrades.map(trade => trade.date).sort().at(-1);
   record.source = "국토교통부 아파트 매매 실거래가 API";
+  record.matchedOfficialNames = [...new Set(complexTrades.map(trade => trade.name))].sort((a, b) => a.localeCompare(b, "ko"));
   record.medianPerPyeong = median(complexTrades.map(trade => Math.round(trade.amount * 3.305785 / trade.area)));
   record.areas = Object.fromEntries(["59", "84", "102", "115"].map(band => [band, summarize(complexTrades.filter(trade => trade.band === band))]));
   prices.complexes[complexId] = record;
