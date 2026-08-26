@@ -220,6 +220,7 @@ if (!trades.length) throw new Error("MOLIT returned no valid trades; existing pr
 
 const inferredIdsByTradeName = new Map();
 const inferredTradeNamesByComplex = new Map();
+// Multiple official names for one inferred complex require a reviewed explicit alias.
 for (const trade of trades) {
   const normalizedTradeName = normalizeName(trade.name);
   const cacheKey = `${trade.regionCode}:${normalizedTradeName}`;
