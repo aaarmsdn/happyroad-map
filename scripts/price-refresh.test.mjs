@@ -29,7 +29,8 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
         { id: "100", name: "LG한강자이(주상복합)", lat: 37.5364, lng: 127.0746, areaTags: ["84"] },
         { id: "101", name: "한강자이2차", lat: 37.53641, lng: 127.07461, areaTags: ["84"] },
         { id: "102", name: "테스트파크", lat: 37.53642, lng: 127.07462, areaTags: ["84"] },
-        { id: "103", name: "샘플파크", lat: 37.53643, lng: 127.07463, areaTags: ["84"] }
+        { id: "103", name: "샘플파크", lat: 37.53643, lng: 127.07463, areaTags: ["84"] },
+        { id: "104", name: "별칭파크", lat: 37.53644, lng: 127.07464, areaTags: ["84"] }
       ]
     })),
     writeFile(pricePath, JSON.stringify({ complexes: {
@@ -45,7 +46,7 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
       }
     } })),
     writeFile(path.join(tempDir, "config", "price-name-aliases.json"), JSON.stringify({
-      "97": ["자양우성7"], "98": ["자양현대7"], "99": ["자양현대7"]
+      "97": ["자양우성7"], "98": ["자양현대7"], "99": ["자양현대7"], "104": ["공식별칭파크"]
     }))
   ]);
   const preloadPath = path.join(tempDir, "molit-name-alias.mjs");
@@ -55,7 +56,7 @@ globalThis.fetch = async url => {
   requests += 1;
   if (requests === 1) throw new TypeError("temporary network failure");
   months.push(new URL(url).searchParams.get("DEAL_YMD"));
-  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>9</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><excluUseAr>133</excluUseAr><dealAmount>180,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>한강자이(고층)</aptNm><excluUseAr>133</excluUseAr><dealAmount>181,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>88,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>서울테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>광진테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>95,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>4</dealDay></item><item><aptNm>서울샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>70,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>5</dealDay></item><item><aptNm>광진샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>75,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>6</dealDay></item></items></body></response>\`, { status: 200 });
+  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>11</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><excluUseAr>133</excluUseAr><dealAmount>180,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>한강자이(고층)</aptNm><excluUseAr>133</excluUseAr><dealAmount>181,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>88,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>서울테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>광진테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>95,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>4</dealDay></item><item><aptNm>서울샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>70,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>5</dealDay></item><item><aptNm>광진샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>75,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>6</dealDay></item><item><aptNm>공식별칭파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>80,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>7</dealDay></item><item><aptNm>서울별칭파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>82,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>8</dealDay></item></items></body></response>\`, { status: 200 });
 };
 process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQUESTS=\${requests}\`));`);
 
@@ -90,8 +91,10 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
     assert.equal(prices.complexes["102"].matchedTradeCount, 12);
     assert.deepEqual(prices.complexes["102"].matchedOfficialNames, ["테스트파크"]);
     assert.equal(prices.complexes["103"], undefined);
+    assert.equal(prices.complexes["104"].matchedTradeCount, 12);
+    assert.deepEqual(prices.complexes["104"].matchedOfficialNames, ["공식별칭파크"]);
     assert.equal(prices.refresh.matchedByUniqueContainment, 24);
-    assert.equal(prices.refresh.skippedAmbiguous, 60);
+    assert.equal(prices.refresh.skippedAmbiguous, 72);
     const months = result.stderr.match(/FETCH_MONTHS=([^\r\n]+)/)?.[1].split(",") || [];
     assert.equal(months.length, 12);
     assert.equal(new Set(months).size, 12);
@@ -109,7 +112,7 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
       await writeFile(preload, source);
       const failure = await new Promise(resolve => {
         const child = spawn(process.execPath, ["--import", pathToFileURL(preload).href, path.join(tempDir, "scripts", "refresh-prices.mjs")], {
-          env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11215", MOLIT_MONTHS: "1" }
+          env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11215", MOLIT_MONTHS: "1", MOLIT_RETRY_DELAY_MS: "0" }
         });
         let stderr = "";
         child.stderr.on("data", chunk => { stderr += chunk; });
@@ -118,6 +121,7 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
       assert.notEqual(failure.code, 0);
       assert.match(failure.stderr, message);
       assert.deepEqual(await readFile(pricePath), beforeFailures);
+      return failure;
     };
     const item = amount => `<item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>${amount}</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item>`;
 
@@ -138,6 +142,10 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
   return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>2</totalCount><items>\${item}</items></body></response>\`, { status: 200 });
 };`, /pagination ended before totalCount/);
     await rejectsRefresh("molit-malformed.mjs", `globalThis.fetch = async () => new Response(${JSON.stringify("<response><header><resultCode>000</resultCode></header><body><totalCount>1</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount></dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item></items></body></response>")}, { status: 200 });`, /malformed trade item/);
+    const timeout = await rejectsRefresh("molit-timeout.mjs", `let requests = 0;
+globalThis.fetch = async () => { requests += 1; throw new TypeError("connect timeout"); };
+process.on("exit", () => console.error(\`REQUESTS=\${requests}\`));`, /connect timeout/);
+    assert.match(timeout.stderr, /REQUESTS=10/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
