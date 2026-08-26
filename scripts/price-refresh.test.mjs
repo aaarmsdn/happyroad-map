@@ -25,7 +25,9 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
       source: {}, stats: {}, complexes: [
         { id: "97", name: "우성7차", lat: 37.53637, lng: 127.074587, areaTags: ["115"] },
         { id: "98", name: "현대7차", lat: 37.53638, lng: 127.074588, areaTags: ["84"] },
-        { id: "99", name: "자양현대7차", lat: 37.53639, lng: 127.074589, areaTags: ["84"] }
+        { id: "99", name: "자양현대7차", lat: 37.53639, lng: 127.074589, areaTags: ["84"] },
+        { id: "100", name: "LG한강자이(주상복합)", lat: 37.5364, lng: 127.0746, areaTags: ["84"] },
+        { id: "101", name: "한강자이2차", lat: 37.53641, lng: 127.07461, areaTags: ["84"] }
       ]
     })),
     writeFile(pricePath, JSON.stringify({ complexes: {
@@ -51,7 +53,7 @@ globalThis.fetch = async url => {
   requests += 1;
   if (requests === 1) throw new TypeError("temporary network failure");
   months.push(new URL(url).searchParams.get("DEAL_YMD"));
-  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>2</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item></items></body></response>\`, { status: 200 });
+  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>3</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><excluUseAr>84</excluUseAr><dealAmount>120,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item></items></body></response>\`, { status: 200 });
 };
 process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQUESTS=\${requests}\`));`);
 
@@ -75,6 +77,11 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
     assert.equal(prices.complexes["98"].matchMethod, null);
     assert.equal(prices.complexes["98"].medianPerPyeong, undefined);
     assert.equal(prices.complexes["99"], undefined);
+    assert.equal(prices.complexes["100"].matchStatus, "matched");
+    assert.equal(prices.complexes["100"].matchMethod, "unique_containment_name_and_lawd_cd_from_boundary");
+    assert.equal(prices.complexes["100"].areas["84"].median, 120000);
+    assert.equal(prices.complexes["101"], undefined);
+    assert.equal(prices.refresh.matchedByUniqueContainment, 12);
     assert.equal(prices.refresh.skippedAmbiguous, 12);
     const months = result.stderr.match(/FETCH_MONTHS=([^\r\n]+)/)?.[1].split(",") || [];
     assert.equal(months.length, 12);

@@ -37,7 +37,7 @@ export function matchingApartmentLinks(links, state, routeNames, complexById) {
 export function priceRecordForDisplay(prices, complexId, expectedRegionCode) {
   const record = prices.complexes[complexId];
   const currentApiMatch = record?.matchStatus === "matched"
-    && ["normalized_name_and_lawd_cd_from_boundary", "configured_alias_and_lawd_cd_from_boundary"].includes(record.matchMethod);
+    && ["normalized_name_and_lawd_cd_from_boundary", "configured_alias_and_lawd_cd_from_boundary", "unique_containment_name_and_lawd_cd_from_boundary"].includes(record.matchMethod);
   const pinnedSnapshot = record?.matchStatus === "snapshot"
     && record.matchMethod === "official_snapshot_by_complex_id"
     && /^[a-f0-9]{64}$/.test(prices.snapshot?.sha256);

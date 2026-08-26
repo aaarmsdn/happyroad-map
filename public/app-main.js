@@ -1,6 +1,6 @@
 import { bindEvents } from "./app-events.js?v=14";
 import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=18";
-import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, pricePerPyeongFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=21";
+import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, pricePerPyeongFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=22";
 import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "./filter-logic.js?v=7";
 import { addApartmentMarkers, addRoutePaths, addStopMarkers, groupStops } from "./map-view.js?v=30";
 import { searchResults, searchResultsHtml } from "./search-view.js?v=10";
