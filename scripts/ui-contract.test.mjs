@@ -162,6 +162,7 @@ test("price refresh preserves existing data on empty API results", async () => {
   ]);
   await Promise.all([
     copyFile(fileURLToPath(new URL("../scripts/refresh-prices.mjs", import.meta.url)), path.join(tempDir, "scripts", "refresh-prices.mjs")),
+    copyFile(fileURLToPath(new URL("../scripts/price-refresh-lib.mjs", import.meta.url)), path.join(tempDir, "scripts", "price-refresh-lib.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/region-match.mjs", import.meta.url)), path.join(tempDir, "scripts", "region-match.mjs")),
     copyFile(fileURLToPath(new URL("../config/sgg.json", import.meta.url)), path.join(tempDir, "config", "sgg.json")),
     copyFile(fileURLToPath(new URL("../config/price-name-aliases.json", import.meta.url)), path.join(tempDir, "config", "price-name-aliases.json")),
@@ -200,6 +201,7 @@ test("price refresh adds newly observed official unit sizes to apartment filters
   ]);
   await Promise.all([
     copyFile(fileURLToPath(new URL("../scripts/refresh-prices.mjs", import.meta.url)), path.join(tempDir, "scripts", "refresh-prices.mjs")),
+    copyFile(fileURLToPath(new URL("../scripts/price-refresh-lib.mjs", import.meta.url)), path.join(tempDir, "scripts", "price-refresh-lib.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/region-match.mjs", import.meta.url)), path.join(tempDir, "scripts", "region-match.mjs")),
     copyFile(fileURLToPath(new URL("../config/sgg.json", import.meta.url)), path.join(tempDir, "config", "sgg.json")),
     copyFile(fileURLToPath(new URL("../config/price-name-aliases.json", import.meta.url)), path.join(tempDir, "config", "price-name-aliases.json")),

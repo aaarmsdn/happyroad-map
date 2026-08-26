@@ -15,6 +15,7 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
   ]);
   await Promise.all([
     copyFile(fileURLToPath(new URL("../scripts/refresh-prices.mjs", import.meta.url)), path.join(tempDir, "scripts", "refresh-prices.mjs")),
+    copyFile(fileURLToPath(new URL("../scripts/price-refresh-lib.mjs", import.meta.url)), path.join(tempDir, "scripts", "price-refresh-lib.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/region-match.mjs", import.meta.url)), path.join(tempDir, "scripts", "region-match.mjs")),
     copyFile(fileURLToPath(new URL("../config/sgg.json", import.meta.url)), path.join(tempDir, "config", "sgg.json"))
   ]);
