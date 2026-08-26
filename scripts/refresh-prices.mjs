@@ -219,7 +219,7 @@ for (const regionCode of regionCodes) {
 if (!trades.length) throw new Error("MOLIT returned no valid trades; existing prices were preserved.");
 
 const inferredIdsByTradeName = new Map();
-const inferredTradeNamesByComplex = new Map();
+const claimedTradeNamesByComplex = new Map();
 // Multiple official names for one inferred complex require a reviewed explicit alias.
 for (const trade of trades) {
   const normalizedTradeName = normalizeName(trade.name);
@@ -227,7 +227,14 @@ for (const trade of trades) {
   if (inferredIdsByTradeName.has(cacheKey)) continue;
   const exactIds = (idsByName.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
   const aliasIds = (idsByAlias.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
-  if (exactIds.length || aliasIds.length) continue;
+  const configuredIds = exactIds.length ? exactIds : aliasIds;
+  if (configuredIds.length) {
+    if (configuredIds.length === 1) {
+      if (!claimedTradeNamesByComplex.has(configuredIds[0])) claimedTradeNamesByComplex.set(configuredIds[0], new Set());
+      claimedTradeNamesByComplex.get(configuredIds[0]).add(normalizedTradeName);
+    }
+    continue;
+  }
   const tradeName = comparableName(trade.name);
   const tradeNumbers = numberSignature(trade.name);
   const candidates = (complexesByRegion.get(trade.regionCode) || []).filter(complex => {
@@ -239,13 +246,13 @@ for (const trade of trades) {
   const ids = candidates.length === 1 ? [candidates[0].id] : [];
   inferredIdsByTradeName.set(cacheKey, ids);
   if (ids.length) {
-    if (!inferredTradeNamesByComplex.has(ids[0])) inferredTradeNamesByComplex.set(ids[0], new Set());
-    inferredTradeNamesByComplex.get(ids[0]).add(normalizedTradeName);
+    if (!claimedTradeNamesByComplex.has(ids[0])) claimedTradeNamesByComplex.set(ids[0], new Set());
+    claimedTradeNamesByComplex.get(ids[0]).add(normalizedTradeName);
   }
 }
 const collidingInferredKeys = new Set();
 for (const [cacheKey, ids] of inferredIdsByTradeName) {
-  if (ids.length && inferredTradeNamesByComplex.get(ids[0]).size > 1) {
+  if (ids.length && claimedTradeNamesByComplex.get(ids[0]).size > 1) {
     inferredIdsByTradeName.set(cacheKey, []);
     collidingInferredKeys.add(cacheKey);
   }
@@ -325,6 +332,9 @@ for (const [complexId, complexTrades] of grouped) {
   prices.complexes[complexId] = record;
   const observedAreas = Object.entries(record.areas).filter(([, area]) => area.count > 0).map(([band]) => band);
   complex.areaTags = ["59", "84", "102", "115"].filter(band => complex.areaTags.includes(band) || observedAreas.includes(band));
+}
+if ([...grouped.keys()].some(id => prices.complexes[id].matchMethod === "unique_containment_name_and_lawd_cd_from_boundary" && prices.complexes[id].matchedOfficialNames?.length !== 1)) {
+  throw new Error("Inferred apartment matches must have exactly one official name.");
 }
 
 const generatedAt = new Date().toISOString();

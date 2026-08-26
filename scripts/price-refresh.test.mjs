@@ -28,7 +28,8 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
         { id: "99", name: "자양현대7차", lat: 37.53639, lng: 127.074589, areaTags: ["84"] },
         { id: "100", name: "LG한강자이(주상복합)", lat: 37.5364, lng: 127.0746, areaTags: ["84"] },
         { id: "101", name: "한강자이2차", lat: 37.53641, lng: 127.07461, areaTags: ["84"] },
-        { id: "102", name: "테스트파크", lat: 37.53642, lng: 127.07462, areaTags: ["84"] }
+        { id: "102", name: "테스트파크", lat: 37.53642, lng: 127.07462, areaTags: ["84"] },
+        { id: "103", name: "샘플파크", lat: 37.53643, lng: 127.07463, areaTags: ["84"] }
       ]
     })),
     writeFile(pricePath, JSON.stringify({ complexes: {
@@ -54,7 +55,7 @@ globalThis.fetch = async url => {
   requests += 1;
   if (requests === 1) throw new TypeError("temporary network failure");
   months.push(new URL(url).searchParams.get("DEAL_YMD"));
-  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>5</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><excluUseAr>133</excluUseAr><dealAmount>180,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>서울테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>광진테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>95,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>4</dealDay></item></items></body></response>\`, { status: 200 });
+  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>8</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><excluUseAr>133</excluUseAr><dealAmount>180,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>88,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>서울테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>광진테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>95,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>4</dealDay></item><item><aptNm>서울샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>70,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>5</dealDay></item><item><aptNm>광진샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>75,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>6</dealDay></item></items></body></response>\`, { status: 200 });
 };
 process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQUESTS=\${requests}\`));`);
 
@@ -86,9 +87,11 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
     assert.deepEqual(prices.complexes["100"].matchedOfficialNames, ["한강자이"]);
     assert.equal(prices.complexes["100"].areas["84"].median, null);
     assert.equal(prices.complexes["101"], undefined);
-    assert.equal(prices.complexes["102"], undefined);
+    assert.equal(prices.complexes["102"].matchedTradeCount, 12);
+    assert.deepEqual(prices.complexes["102"].matchedOfficialNames, ["테스트파크"]);
+    assert.equal(prices.complexes["103"], undefined);
     assert.equal(prices.refresh.matchedByUniqueContainment, 12);
-    assert.equal(prices.refresh.skippedAmbiguous, 36);
+    assert.equal(prices.refresh.skippedAmbiguous, 60);
     const months = result.stderr.match(/FETCH_MONTHS=([^\r\n]+)/)?.[1].split(",") || [];
     assert.equal(months.length, 12);
     assert.equal(new Set(months).size, 12);
