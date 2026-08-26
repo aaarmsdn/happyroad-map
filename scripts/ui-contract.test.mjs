@@ -228,6 +228,25 @@ test("price refresh adds newly observed official unit sizes to apartment filters
     assert.match(apartments.areaTagsGeneratedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.equal(apartments.stats.priceStatus, "official_api_refreshed");
     assert.equal(apartments.stats.areaCounts["59"] > 0, true);
+
+    const pricePath = path.join(tempDir, "public", "data", "prices.json");
+    const unsafePrices = JSON.parse(await readFile(pricePath, "utf8"));
+    unsafePrices.complexes.unsafe = {
+      matchStatus: "matched",
+      matchMethod: "unique_containment_name_and_lawd_cd_from_boundary",
+      matchedOfficialNames: ["서로다른단지A", "서로다른단지B"]
+    };
+    await writeFile(pricePath, JSON.stringify(unsafePrices));
+    const unsafeResult = await new Promise(resolve => {
+      const child = spawn(process.execPath, ["--import", pathToFileURL(preloadPath).href, path.join(tempDir, "scripts", "refresh-prices.mjs")], {
+        env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11200", MOLIT_MONTHS: "1" }
+      });
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk; });
+      child.on("close", code => resolve({ code, stderr }));
+    });
+    assert.notEqual(unsafeResult.code, 0);
+    assert.match(unsafeResult.stderr, /Inferred apartment matches must have exactly one official name/);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

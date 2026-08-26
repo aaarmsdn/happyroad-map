@@ -334,7 +334,8 @@ for (const [complexId, complexTrades] of grouped) {
   const observedAreas = Object.entries(record.areas).filter(([, area]) => area.count > 0).map(([band]) => band);
   complex.areaTags = ["59", "84", "102", "115"].filter(band => complex.areaTags.includes(band) || observedAreas.includes(band));
 }
-if ([...grouped.keys()].some(id => prices.complexes[id].matchMethod === "unique_containment_name_and_lawd_cd_from_boundary" && prices.complexes[id].matchedOfficialNames?.length !== 1)) {
+if (Object.values(prices.complexes).some(record => record.matchMethod === "unique_containment_name_and_lawd_cd_from_boundary"
+  && new Set(record.matchedOfficialNames?.map(normalizeName)).size !== 1)) {
   throw new Error("Inferred apartment matches must have exactly one official name.");
 }
 
