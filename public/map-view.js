@@ -151,23 +151,21 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
   if (map.getZoom() < 14) {
     const cellSize = 0.05 * 2 ** (11 - map.getZoom());
     const clusters = clusterItems(items, item => [item.complex.lat, item.complex.lng], cellSize);
-    const singletonPoints = clusters
-      .filter(cluster => cluster.items.length === 1)
-      .map(cluster => map.latLngToLayerPoint([cluster.items[0].complex.lat, cluster.items[0].complex.lng]));
-    const summaryPoints = spreadMarkerPoints(
-      clusters.filter(cluster => cluster.items.length > 1).map(cluster => map.latLngToLayerPoint([cluster.lat, cluster.lng])),
-      68,
-      [...occupiedPoints, ...singletonPoints]
-    );
-    let summaryIndex = 0;
     for (const cluster of clusters) {
       const single = cluster.items.length === 1 ? cluster.items[0] : null;
       if (!single) {
         const size = Math.min(42, 25 + Math.log2(cluster.items.length) * 3);
-        const marker = L.marker(map.layerPointToLatLng(summaryPoints[summaryIndex++]), { icon: markerIcon(L, `<span class="map-cluster apartment-cluster" style="--cluster-size:${size}px"><i data-lucide="building-2"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 200 });
-        marker.bindTooltip(`아파트 ${cluster.items.length.toLocaleString("ko-KR")}단지`, { direction: "top" });
-        marker.on("click", () => map.setView([cluster.lat, cluster.lng], Math.min(14, map.getZoom() + 2)));
-        addAccessibleMarker(marker, layer, `아파트 ${cluster.items.length.toLocaleString("ko-KR")}단지`);
+        const representative = cluster.items.reduce((nearest, item) => {
+          const distance = (item.complex.lat - cluster.lat) ** 2 + (item.complex.lng - cluster.lng) ** 2;
+          return distance < nearest.distance ? { item, distance } : nearest;
+        }, { item: cluster.items[0], distance: Infinity }).item;
+        const prices = cluster.items.map(item => perPyeongOf(item.complex.id)).filter(value => Number.isFinite(value) && value > 0);
+        const averagePerPyeong = prices.length ? Math.round(prices.reduce((sum, value) => sum + value, 0) / prices.length) : null;
+        const label = `아파트 ${cluster.items.length.toLocaleString("ko-KR")}단지${averagePerPyeong ? ` · 평균 평당 ${averagePerPyeong.toLocaleString("ko-KR")}만` : ""}`;
+        const marker = L.marker([representative.complex.lat, representative.complex.lng], { icon: markerIcon(L, `<span class="map-cluster apartment-cluster" style="--cluster-size:${size}px;--marker-color:${colorOf(averagePerPyeong)}"><i data-lucide="building-2"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 200 });
+        marker.bindTooltip(label, { direction: "top" });
+        marker.on("click", () => map.setView([representative.complex.lat, representative.complex.lng], Math.min(14, map.getZoom() + 2)));
+        addAccessibleMarker(marker, layer, label);
         continue;
       }
       const median = priceOf(single.complex.id);

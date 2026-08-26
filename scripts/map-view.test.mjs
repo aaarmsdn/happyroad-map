@@ -60,7 +60,7 @@ test("individual map markers keep their source coordinates", () => {
   }
 });
 
-test("low-zoom cluster summaries avoid exact singleton markers", () => {
+test("low-zoom stop cluster summaries avoid exact singleton markers", () => {
   let placed = [];
   const L = {
     divIcon: options => options,
@@ -90,16 +90,44 @@ test("low-zoom cluster summaries avoid exact singleton markers", () => {
   }]));
   addStopMarkers({ L, map, layer: {}, groupedStops: stops, onSelect: () => {} });
   assert.ok(distance(placed) >= 42, `stop summary is only ${distance(placed)}px from singleton`);
+});
 
-  placed = [];
+test("apartment clusters use a real complex coordinate and average per-pyeong color", () => {
+  const placed = [];
+  const icons = [];
+  const tooltips = [];
+  const colorInputs = [];
+  const L = {
+    divIcon: options => { icons.push(options.html); return options; },
+    marker: latLng => ({
+      addTo() { placed.push(latLng); return this; },
+      bindTooltip(label) { tooltips.push(label); return this; },
+      getElement() { return null; },
+      getLatLng() { return latLng; },
+      on() { return this; }
+    })
+  };
+  const map = {
+    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
+    getZoom: () => 13,
+    setView() {},
+    latLngToLayerPoint: ([lat, lng]) => ({ x: lng * 100, y: lat * 100 })
+  };
+  const coordinates = [[37.5, 127], [37.501, 127.001], [37.502, 127.002]];
   const complexes = new Map(coordinates.map(([lat, lng], index) => [String(index), {
     id: String(index), name: `아파트${index}`, lat, lng
   }]));
   addApartmentMarkers({
     L, map, layer: {}, visibleLinks: new Map([["0", {}], ["1", {}], ["2", {}]]), complexById: complexes,
-    priceOf: () => null, colorOf: () => "#f04438", onSelect: () => {}
+    priceOf: () => null,
+    perPyeongOf: id => ({ "0": 2000, "1": 4000, "2": 6000 })[id],
+    colorOf: value => { colorInputs.push(value); return "#2774ae"; },
+    onSelect: () => {}
   });
-  assert.ok(distance(placed) >= 68, `apartment summary is only ${distance(placed)}px from singleton`);
+  assert.deepEqual(placed, [[37.501, 127.001]]);
+  assert.deepEqual(colorInputs, [4000]);
+  assert.match(icons[0], /--marker-color:#2774ae/);
+  assert.equal(tooltips[0], "아파트 3단지 · 평균 평당 4,000만");
 });
 
 test("a co-located stop remains the primary pointer target", () => {

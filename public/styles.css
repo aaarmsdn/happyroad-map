@@ -201,7 +201,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .map-cluster svg { width: 12px; height: 12px; }
 .map-cluster b { font-size: 10px; }
 .stop-cluster { border-radius: 7px; background: #14213d; }
-.apartment-cluster { border-radius: 50%; background: #f04438; }
+.apartment-cluster { border-radius: 50%; background: var(--marker-color, var(--accent)); }
 .apartment-price-marker { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 3px; width: 66px; height: 30px; padding: 0 7px; border: 2px solid var(--marker-color, var(--accent)); border-radius: 6px; color: var(--ink); background: white; box-shadow: 0 2px 8px rgba(20,33,61,.3); font-size: 12px; white-space: nowrap; }
 .apartment-price-marker::after { position: absolute; bottom: -5px; left: 29px; width: 8px; height: 8px; border-right: 2px solid var(--marker-color, var(--accent)); border-bottom: 2px solid var(--marker-color, var(--accent)); background: white; content: ""; transform: rotate(45deg); }
 .apartment-price-marker svg { width: 13px; height: 13px; color: var(--marker-color, var(--accent)); }
