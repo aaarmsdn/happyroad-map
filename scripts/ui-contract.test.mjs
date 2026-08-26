@@ -137,6 +137,22 @@ test("apartment numeric metadata cannot inject executable HTML", () => {
   assert.equal(html.match(/&lt;img/g)?.length, 3);
 });
 
+test("apartment details show overall per-pyeong prices when target areas have no trades", () => {
+  const html = apartmentDetailHtml({
+    complex: { name: "단지", type: "아파트", households: 325, completed: "2004", externalUrl: "" },
+    nearestLink: null,
+    relatedLinks: [],
+    record: {
+      matchStatus: "matched", latestTradeDate: "20260718", medianPerPyeong: 3283, matchedTradeCount: 24,
+      areas: Object.fromEntries(["59", "84", "102", "115"].map(area => [area, { count: 0 }]))
+    },
+    selectedArea: "전체"
+  });
+  assert.match(html, /전체 면적/);
+  assert.match(html, /평당 3,283만/);
+  assert.match(html, /24건 · 대상 면적 외 거래 포함/);
+});
+
 test("price refresh preserves existing data on empty API results", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-refresh-"));
   await Promise.all([

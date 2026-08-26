@@ -30,6 +30,9 @@ function timeMinutes(value) {
 function areaMetrics(record, selectedArea) {
   const ordered = selectedArea === "전체" ? ["59", "84", "102", "115"] : [selectedArea];
   const available = ordered.filter(area => Number(record?.areas?.[area]?.count) > 0);
+  if (!available.length && selectedArea === "전체" && Number(record?.medianPerPyeong) > 0) {
+    return `<div class="price-list"><div class="price-row"><b>전체 면적</b><span>평당 ${Number(record.medianPerPyeong).toLocaleString("ko-KR")}만</span><small>${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건 · 대상 면적 외 거래 포함</small></div></div>`;
+  }
   if (!available.length) return `<p class="empty-note">선택 면적의 최근 실거래가가 없습니다.</p>`;
   return `<div class="price-list">${available.map(area => {
     const data = record.areas[area];
