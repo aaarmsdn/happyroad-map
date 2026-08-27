@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { areaBand, comparableName, fetchMonth, median, normalizeName, numberSignature, recentMonths, summarize } from "./price-refresh-lib.mjs";
+import { areaBand, comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize } from "./price-refresh-lib.mjs";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -191,7 +191,15 @@ for (const [complexId, complexTrades] of grouped) {
   record.latestTradeDate = complexTrades.map(trade => trade.date).sort().at(-1);
   record.source = "국토교통부 아파트 매매 실거래가 API";
   record.matchedOfficialNames = [...new Set(complexTrades.map(trade => trade.name))].sort((a, b) => a.localeCompare(b, "ko"));
-  record.medianPerPyeong = median(complexTrades.map(trade => Math.round(trade.amount * 3.305785 / trade.area)));
+  const overall = summarize(complexTrades);
+  record.min = overall.min;
+  record.average = overall.average;
+  record.median = overall.median;
+  record.max = overall.max;
+  record.minPerPyeong = overall.minPerPyeong;
+  record.averagePerPyeong = overall.averagePerPyeong;
+  record.medianPerPyeong = overall.medianPerPyeong;
+  record.maxPerPyeong = overall.maxPerPyeong;
   record.areas = Object.fromEntries(["59", "84", "102", "115"].map(band => [band, summarize(complexTrades.filter(trade => trade.band === band))]));
   prices.complexes[complexId] = record;
   const observedAreas = Object.entries(record.areas).filter(([, area]) => area.count > 0).map(([band]) => band);

@@ -6,8 +6,9 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import vm from "node:vm";
+import { commuteJourneyDetailHtml, commuteResultsHtml } from "../public/commute-view.js";
 import { apartmentDetailHtml, stopDetailHtml } from "../public/detail-view.js";
-import { priceRecordForDisplay } from "../public/filter-data.js";
+import { apartmentDoorTimes, apartmentStopTimings, priceRecordForDisplay, stopRepresentativeMinutes } from "../public/filter-data.js";
 import { formatDate, safeExternalUrl } from "../public/ui-utils.js";
 
 const read = name => readFile(new URL(`../${name}`, import.meta.url), "utf8");
@@ -24,15 +25,178 @@ test("public app metadata does not identify a specific employer", async () => {
   assert.doesNotMatch(`${html}\n${manifest}\n${readme}\n${packageJson}`, /sk\s*(?:하이닉스|hynix)|hynix/i);
 });
 
-test("route preview survives map navigation and clears for apartment details", async () => {
-  const appMain = await read("public/app-main.js");
-  const renderMap = appMain.match(/function renderMap[\s\S]*?\r?\n}\r?\n\r?\nfunction openDetail/)?.[0] || "";
-  const showRoute = appMain.match(/function showRoute[\s\S]*?\n}\n\nfunction renderSearchResults/)?.[0] || "";
-  const openApartmentDetail = appMain.match(/function openApartmentDetail[\s\S]*?\r?\n}\r?\n\r?\nfunction showRoute/)?.[0] || "";
-  assert.doesNotMatch(renderMap, /clearRoute\(\)/);
-  assert.doesNotMatch(showRoute, /\.fitBounds\(|\.setView\(/);
-  assert.doesNotMatch(appMain, /addEventListener\("pointerdown", clearRoute/);
-  assert.match(openApartmentDetail, /clearRoute\(\)/);
+test("stop details show shuttle duration and arrival time in both directions", () => {
+  const html = stopDetailHtml({
+    name: "성수역",
+    lat: 37.54,
+    lng: 127.05,
+    entries: [
+      {
+        uidKey: "in-1", routeName: "성수 출근", routeCategory: "출근", turnName: "통상 출근", routeType: "통상",
+        time: "06:30:12", companyTime: "08:00:00", minutesToCompany: 90
+      },
+      {
+        uidKey: "out-1", routeName: "성수 퇴근", routeCategory: "퇴근", turnName: "통상 18시퇴근", routeType: "통상",
+        time: "19:20:10", companyTime: "18:00:00", minutesFromCompany: 80
+      }
+    ]
+  });
+  assert.match(html, /06:30/);
+  assert.match(html, /90분 · 회사 08:00 도착/);
+  assert.match(html, /18:00/);
+  assert.match(html, /80분 · 정류장 19:20 도착/);
+});
+
+test("stop details do not invent zero-minute outbound timings from missing data", () => {
+  const html = stopDetailHtml({
+    name: "시간 미확인 정류장",
+    lat: 37.5,
+    lng: 127,
+    entries: [{
+      uidKey: "out-missing", routeName: "퇴근선", routeCategory: "퇴근", turnName: "통상 18시퇴근", routeType: "통상",
+      time: "", companyTime: "18:00", minutesFromCompany: null, turnFinalArrivalTime: "20:00"
+    }]
+  });
+  assert.match(html, /18:00/);
+  assert.doesNotMatch(html, /0분/);
+  assert.doesNotMatch(html, /정류장 20:00 도착/);
+});
+
+test("apartment station timings prefer normal inbound and 18:00 outbound runs", () => {
+  const timing = apartmentStopTimings([
+    { routeCategory: "출근", turnName: "교대 출근", companyTime: "07:55", minutesToCompany: 45 },
+    { routeCategory: "출근", turnName: "통상 출근", companyTime: "08:20", minutesToCompany: 62 },
+    { routeCategory: "퇴근", turnName: "통상 17시퇴근", companyTime: "17:00", minutesFromCompany: 50 },
+    { routeCategory: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 58 }
+  ]);
+  assert.deepEqual(timing, {
+    inboundMinutes: 62, outboundMinutes: 58,
+    inboundStopAt: "07:18", inboundCompanyAt: "08:20", outboundCompanyAt: "18:00", outboundStopAt: "18:58",
+    fallbackLabel: ""
+  });
+});
+
+test("apartment door times include walking before and after the normal shuttle", () => {
+  assert.deepEqual(apartmentDoorTimes({
+    inboundStopAt: "06:30", outboundStopAt: "19:20"
+  }, 0.96), { leaveHomeAt: "06:18", arriveHomeAt: "19:32" });
+  assert.deepEqual(apartmentDoorTimes({
+    inboundStopAt: "00:05", outboundStopAt: "23:55"
+  }, 0.8), { leaveHomeAt: "23:55", arriveHomeAt: "00:05" });
+  assert.deepEqual(apartmentDoorTimes({
+    inboundStopAt: "07:27", outboundStopAt: "18:31"
+  }, 0.3), { leaveHomeAt: "07:23", arriveHomeAt: "18:35" });
+});
+
+test("station timing uses direction for regional shuttle categories", () => {
+  assert.deepEqual(apartmentStopTimings([
+    { routeCategory: "이천->청주", direction: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 72 }
+  ]), {
+    inboundMinutes: null, outboundMinutes: 72,
+    inboundStopAt: null, inboundCompanyAt: null, outboundCompanyAt: "18:00", outboundStopAt: "19:12",
+    fallbackLabel: ""
+  });
+});
+
+test("apartment station timings label the closest schedule fallback", () => {
+  const timing = apartmentStopTimings([
+    { routeCategory: "출근", turnName: "교대 출근", companyTime: "07:55", minutesToCompany: 45 },
+    { routeCategory: "퇴근", turnName: "통상 17시퇴근", companyTime: "17:00", minutesFromCompany: 50 }
+  ]);
+  assert.deepEqual(timing, {
+    inboundMinutes: 45, outboundMinutes: 50,
+    inboundStopAt: "07:10", inboundCompanyAt: "07:55", outboundCompanyAt: "17:00", outboundStopAt: "17:50",
+    fallbackLabel: "교대 출근 · 통상 17시퇴근 기준"
+  });
+});
+
+test("apartment station timings omit a missing commute direction", () => {
+  const timing = apartmentStopTimings([
+    { routeCategory: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 68 }
+  ]);
+  assert.deepEqual(timing, {
+    inboundMinutes: null, outboundMinutes: 68,
+    inboundStopAt: null, inboundCompanyAt: null, outboundCompanyAt: "18:00", outboundStopAt: "19:08",
+    fallbackLabel: ""
+  });
+  assert.equal(stopRepresentativeMinutes([{ routeCategory: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 68 }]), 68);
+});
+
+test("apartment details show inbound, outbound and walking values per stop", () => {
+  const html = apartmentDetailHtml({
+    complex: { name: "단지", type: "아파트", households: 100, completed: "2020", externalUrl: "" },
+    nearestLink: null,
+    relatedLinks: [{
+      station: "성수역", routes: ["노선"], distanceKm: 0.4, inboundMinutes: 62, outboundMinutes: 58,
+      inboundStopAt: "06:30", inboundCompanyAt: "08:00", outboundCompanyAt: "18:00", outboundStopAt: "19:20",
+      leaveHomeAt: "06:18", arriveHomeAt: "19:32", fallbackLabel: ""
+    }],
+    record: null,
+    selectedArea: "전체"
+  });
+  assert.match(html, /출근 62분 · 퇴근 58분 · 도보 0\.4km/);
+  assert.match(html, /집 06:18 출발 · 셔틀 06:30 · 회사 08:00/);
+  assert.match(html, /회사 18:00 · 정류장 19:20 · 집 19:32 도착/);
+  assert.match(html, /출퇴근/);
+});
+
+test("apartment details show only the available stop direction", () => {
+  const html = apartmentDetailHtml({
+    complex: { name: "단지", type: "아파트", households: 100, completed: "2020", externalUrl: "" },
+    nearestLink: null,
+    relatedLinks: [{ station: "성수역", routes: ["노선"], distanceKm: 0.4, inboundMinutes: null, outboundMinutes: 58, fallbackLabel: "" }],
+    record: null,
+    selectedArea: "전체"
+  });
+  assert.match(html, /direction-badge">퇴근<\/em>/);
+  assert.doesNotMatch(html, /출퇴근|출근 -|퇴근 -|노선 없음/);
+});
+
+test("commute result UI exposes breakdown and concrete journey detail", () => {
+  const journey = {
+    accessMode: "public-transit", accessLabel: "대중교통", routeName: "노선", station: "성수역",
+    shuttleAt: "07:00", arrivalAt: "08:00", totalMinutes: 90, waitMinutes: 20, shuttleMinutes: 60,
+    accessMinutes: 10, accessEstimated: false, accessTransfers: 1, accessFare: 1550, direction: "to-company",
+    accessRoute: { steps: [{ type: "subway", guidance: "2호선 성수역 → 강남역", minutes: 10, stopCount: 5 }] }
+  };
+  const results = commuteResultsHtml([journey]);
+  assert.match(results, /총 90분/);
+  assert.match(results, /대기[\s\S]*20분[\s\S]*셔틀[\s\S]*60분[\s\S]*대중교통[\s\S]*10분/);
+  assert.match(results, /대중교통 총요금 1,550원/);
+  assert.match(results, /경로 상세보기/);
+  const detail = commuteJourneyDetailHtml(journey);
+  assert.match(detail, /총합[\s\S]*90분[\s\S]*대기[\s\S]*20분[\s\S]*셔틀[\s\S]*60분[\s\S]*대중교통[\s\S]*10분/);
+  assert.match(detail, /2호선 성수역 → 강남역/);
+  assert.match(detail, /성수역 승차 → 회사 하차/);
+  const homeDetail = commuteJourneyDetailHtml({ ...journey, direction: "from-company", shuttleAt: "18:00", arrivalAt: "19:23" });
+  assert.match(homeDetail, /셔틀 \+ 대중교통/);
+  assert.doesNotMatch(homeDetail, /대중교통 \+ 셔틀/);
+  assert.match(homeDetail, /회사 · 18:00 출발 · 성수역 하차/);
+  assert.doesNotMatch(homeDetail, /성수역 · 18:00 출발/);
+  assert.match(homeDetail, /회사 승차 → 성수역 하차/);
+});
+
+test("walk and taxi durations show route distance", () => {
+  const base = {
+    accessLabel: "도보", routeName: "노선", station: "정류장", shuttleAt: "07:00", arrivalAt: "08:00",
+    totalMinutes: 90, waitMinutes: 20, shuttleMinutes: 60, accessMinutes: 10, accessDistanceMeters: 1850,
+    accessEstimated: false, accessTransfers: 0, accessFare: 0, direction: "to-company", accessRoute: { steps: [] }
+  };
+  assert.match(commuteResultsHtml([{ ...base, accessMode: "walk" }]), /10분 \(1\.9km\)/);
+  assert.match(commuteJourneyDetailHtml({ ...base, accessMode: "car", accessLabel: "택시" }), /10분 \(1\.9km\)/);
+  assert.match(commuteResultsHtml([{ ...base, accessMode: "walk", accessDistanceMeters: 0 }]), /10분 \(0\.0km\)/);
+});
+
+test("apartment settings expose highest, average, and lowest price modes", async () => {
+  const html = await read("public/index.html");
+  assert.match(html, /data-price-metric="max"[^>]*>최고값/);
+  assert.match(html, /data-price-metric="average"[^>]*>평균값/);
+  assert.match(html, /data-price-metric="min"[^>]*>최저값/);
+});
+
+test("price summary changes trigger the automatic refresh workflow", async () => {
+  const workflow = await read(".github/workflows/refresh-prices.yml");
+  assert.match(workflow, /- "scripts\/price-refresh-lib\.mjs"/);
 });
 
 test("pending prices cannot reach apartment details", () => {
@@ -118,149 +282,33 @@ test("service worker falls back to cached HTML after a navigation network failur
   assert.deepEqual(events, ["network", "cache"]);
 });
 
-test("untrusted dates and external URLs cannot become executable HTML", () => {
-  assert.equal(formatDate('<img src=x onerror="alert(1)">'), "날짜 없음");
-  assert.equal(safeExternalUrl("javascript:alert(1)"), "https://new.land.naver.com/");
-  assert.equal(safeExternalUrl("https://new.land.naver.com/complexes/123"), "https://new.land.naver.com/complexes/123");
-});
+test("service worker precaches every versioned module dependency", async () => {
+  const [serviceWorker, html] = await Promise.all([read("public/sw.js"), read("public/index.html")]);
+  const handlers = {};
+  let shell = [];
+  const context = {
+    URL,
+    caches: { open: async () => ({ addAll: async resources => { shell = resources; } }) },
+    self: {
+      location: { origin: "https://app.example" },
+      clients: { claim: () => {} },
+      skipWaiting: () => {},
+      addEventListener: (type, handler) => { handlers[type] = handler; }
+    }
+  };
+  vm.runInNewContext(serviceWorker, context);
+  let installPromise;
+  handlers.install({ waitUntil: promise => { installPromise = promise; } });
+  await installPromise;
 
-test("apartment numeric metadata cannot inject executable HTML", () => {
-  const payload = '<img src=x onerror="alert(1)">';
-  const html = apartmentDetailHtml({
-    complex: { name: "단지", type: "아파트", households: payload, completed: "2026", externalUrl: "" },
-    nearestLink: { station: "정류장", distanceKm: 0.2, travelMinutes: payload },
-    relatedLinks: [{ station: "정류장", routes: ["노선"], distanceKm: 0.2, travelMinutes: payload }],
-    record: null,
-    selectedArea: "전체"
-  });
-  assert.doesNotMatch(html, /<img/);
-  assert.equal(html.match(/&lt;img/g)?.length, 3);
-});
-
-test("apartment details show overall per-pyeong prices when target areas have no trades", () => {
-  const html = apartmentDetailHtml({
-    complex: { name: "단지", type: "아파트", households: 325, completed: "2004", externalUrl: "" },
-    nearestLink: null,
-    relatedLinks: [],
-    record: {
-      matchStatus: "matched", latestTradeDate: "20260718", medianPerPyeong: 3283, matchedTradeCount: 24,
-      areas: Object.fromEntries(["59", "84", "102", "115"].map(area => [area, { count: 0 }]))
-    },
-    selectedArea: "전체"
-  });
-  assert.match(html, /전체 면적/);
-  assert.match(html, /평당 3,283만/);
-  assert.match(html, /24건 · 대상 면적 외 거래 포함/);
-});
-
-test("price refresh preserves existing data on empty API results", async () => {
-  const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-refresh-"));
-  await Promise.all([
-    mkdir(path.join(tempDir, "scripts"), { recursive: true }),
-    mkdir(path.join(tempDir, "config"), { recursive: true }),
-    mkdir(path.join(tempDir, "public", "data"), { recursive: true })
-  ]);
-  await Promise.all([
-    copyFile(fileURLToPath(new URL("../scripts/refresh-prices.mjs", import.meta.url)), path.join(tempDir, "scripts", "refresh-prices.mjs")),
-    copyFile(fileURLToPath(new URL("../scripts/price-refresh-lib.mjs", import.meta.url)), path.join(tempDir, "scripts", "price-refresh-lib.mjs")),
-    copyFile(fileURLToPath(new URL("../scripts/region-match.mjs", import.meta.url)), path.join(tempDir, "scripts", "region-match.mjs")),
-    copyFile(fileURLToPath(new URL("../config/sgg.json", import.meta.url)), path.join(tempDir, "config", "sgg.json")),
-    copyFile(fileURLToPath(new URL("../config/price-name-aliases.json", import.meta.url)), path.join(tempDir, "config", "price-name-aliases.json")),
-    copyFile(fileURLToPath(new URL("../public/data/apartments.json", import.meta.url)), path.join(tempDir, "public", "data", "apartments.json")),
-    copyFile(fileURLToPath(new URL("../public/data/prices.json", import.meta.url)), path.join(tempDir, "public", "data", "prices.json"))
-  ]);
-  const pricePath = path.join(tempDir, "public", "data", "prices.json");
-  const refreshPath = path.join(tempDir, "scripts", "refresh-prices.mjs");
-  const before = await readFile(pricePath);
-  const preloadPath = path.join(tempDir, "empty-molit.mjs");
-  await writeFile(preloadPath, `globalThis.fetch = async () => new Response("<response><header><resultCode>000</resultCode></header><body><totalCount>0</totalCount><items></items></body></response>", { status: 200 });`);
-
-  try {
-    const result = await new Promise(resolve => {
-      const child = spawn(process.execPath, ["--import", pathToFileURL(preloadPath).href, refreshPath], {
-        env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11110", MOLIT_MONTHS: "1" }
-      });
-      let stderr = "";
-      child.stderr.on("data", chunk => { stderr += chunk; });
-      child.on("close", code => resolve({ code, stderr }));
-    });
-    assert.notEqual(result.code, 0);
-    assert.match(result.stderr, /MOLIT returned no valid trades; existing prices were preserved/);
-    assert.deepEqual(await readFile(pricePath), before);
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
+  for (const [, entry] of html.matchAll(/(?:src|href)="(\.\/[^\"]+\?v=[^\"]+)"/g)) {
+    assert.ok(shell.includes(entry), `index.html loads uncached ${entry}`);
   }
-});
 
-test("price refresh adds newly observed official unit sizes to apartment filters", async () => {
-  const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-refresh-area-"));
-  await Promise.all([
-    mkdir(path.join(tempDir, "scripts"), { recursive: true }),
-    mkdir(path.join(tempDir, "config"), { recursive: true }),
-    mkdir(path.join(tempDir, "public", "data"), { recursive: true })
-  ]);
-  await Promise.all([
-    copyFile(fileURLToPath(new URL("../scripts/refresh-prices.mjs", import.meta.url)), path.join(tempDir, "scripts", "refresh-prices.mjs")),
-    copyFile(fileURLToPath(new URL("../scripts/price-refresh-lib.mjs", import.meta.url)), path.join(tempDir, "scripts", "price-refresh-lib.mjs")),
-    copyFile(fileURLToPath(new URL("../scripts/region-match.mjs", import.meta.url)), path.join(tempDir, "scripts", "region-match.mjs")),
-    copyFile(fileURLToPath(new URL("../config/sgg.json", import.meta.url)), path.join(tempDir, "config", "sgg.json")),
-    copyFile(fileURLToPath(new URL("../config/price-name-aliases.json", import.meta.url)), path.join(tempDir, "config", "price-name-aliases.json")),
-    copyFile(fileURLToPath(new URL("../public/data/apartments.json", import.meta.url)), path.join(tempDir, "public", "data", "apartments.json")),
-    copyFile(fileURLToPath(new URL("../public/data/prices.json", import.meta.url)), path.join(tempDir, "public", "data", "prices.json"))
-  ]);
-  const apartmentPath = path.join(tempDir, "public", "data", "apartments.json");
-  const apartmentFixture = JSON.parse(await readFile(apartmentPath, "utf8"));
-  apartmentFixture.complexes.find(complex => complex.id === "8104").areaTags = ["102"];
-  await writeFile(apartmentPath, JSON.stringify(apartmentFixture));
-  const preloadPath = path.join(tempDir, "one-molit-trade.mjs");
-  await writeFile(preloadPath, `globalThis.fetch = async () => new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>1</totalCount><items><item><aptNm>성수롯데캐슬파크</aptNm><excluUseAr>59.8</excluUseAr><dealAmount>150,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item></items></body></response>\`, { status: 200 });`);
-
-  try {
-    const result = await new Promise(resolve => {
-      const child = spawn(process.execPath, ["--import", pathToFileURL(preloadPath).href, path.join(tempDir, "scripts", "refresh-prices.mjs")], {
-        env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11200", MOLIT_MONTHS: "1" }
-      });
-      let stderr = "";
-      child.stderr.on("data", chunk => { stderr += chunk; });
-      child.on("close", code => resolve({ code, stderr }));
-    });
-    assert.equal(result.code, 0, result.stderr);
-    const apartments = JSON.parse(await readFile(apartmentPath, "utf8"));
-    assert.deepEqual(apartments.complexes.find(complex => complex.id === "8104").areaTags, ["59", "102"]);
-    assert.match(apartments.areaTagsGeneratedAt, /^\d{4}-\d{2}-\d{2}T/);
-    assert.equal(apartments.stats.priceStatus, "official_api_refreshed");
-    assert.equal(apartments.stats.areaCounts["59"] > 0, true);
-
-    const pricePath = path.join(tempDir, "public", "data", "prices.json");
-    const unsafePrices = JSON.parse(await readFile(pricePath, "utf8"));
-    unsafePrices.complexes.unsafe = {
-      matchStatus: "matched",
-      matchMethod: "unique_containment_name_and_lawd_cd_from_boundary",
-      matchedOfficialNames: ["서로다른단지A", "서로다른단지B"]
-    };
-    await writeFile(pricePath, JSON.stringify(unsafePrices));
-    const unsafeResult = await new Promise(resolve => {
-      const child = spawn(process.execPath, ["--import", pathToFileURL(preloadPath).href, path.join(tempDir, "scripts", "refresh-prices.mjs")], {
-        env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11200", MOLIT_MONTHS: "1" }
-      });
-      let stderr = "";
-      child.stderr.on("data", chunk => { stderr += chunk; });
-      child.on("close", code => resolve({ code, stderr }));
-    });
-    assert.notEqual(unsafeResult.code, 0);
-    assert.match(unsafeResult.stderr, /Inferred apartment matches must have exactly one official name/);
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
+  for (const resource of shell.filter(item => /\.js\?v=/.test(item))) {
+    const source = await read(`public/${resource.slice(2).split("?")[0]}`);
+    for (const [, dependency] of source.matchAll(/from\s+"(\.\/[^\"]+)"/g)) {
+      assert.ok(shell.includes(dependency), `${resource} imports uncached ${dependency}`);
+    }
   }
-});
-
-test("stop departures sort by numeric time", () => {
-  const html = stopDetailHtml({
-    name: "테스트", lat: 0, lng: 0,
-    entries: [
-      { uidKey: "late", time: "10:00", routeName: "늦은 노선", routeCategory: "출근", turnName: "", routeType: "" },
-      { uidKey: "early", time: "9:00", routeName: "이른 노선", routeCategory: "출근", turnName: "", routeType: "" }
-    ]
-  });
-  assert.ok(html.indexOf("이른 노선") < html.indexOf("늦은 노선"));
 });

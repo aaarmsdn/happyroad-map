@@ -5,6 +5,25 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { summarize } from "./price-refresh-lib.mjs";
+
+test("trade summaries include arithmetic averages and per-pyeong extrema", () => {
+  assert.deepEqual(summarize([
+    { amount: 10000, area: 84 },
+    { amount: 12000, area: 84 },
+    { amount: 16000, area: 84 }
+  ]), {
+    count: 3,
+    min: 10000,
+    average: 12667,
+    median: 12000,
+    max: 16000,
+    minPerPyeong: 394,
+    averagePerPyeong: 498,
+    medianPerPyeong: 472,
+    maxPerPyeong: 630
+  });
+});
 
 test("price refresh matches official neighborhood-prefixed apartment names", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-name-match-"));
@@ -85,7 +104,9 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
     assert.equal(prices.complexes["100"].matchMethod, "unique_containment_name_and_lawd_cd_from_boundary");
     assert.equal(prices.complexes["100"].matchedTradeCount, 24);
     assert.equal(prices.complexes["100"].latestTradeDate, "20260803");
-    assert.equal(prices.complexes["100"].medianPerPyeong, 4487);
+    assert.equal(prices.complexes["100"].max, 181000);
+    assert.equal(prices.complexes["100"].average, 180500);
+    assert.equal(prices.complexes["100"].medianPerPyeong, 4486);
     assert.deepEqual(prices.complexes["100"].matchedOfficialNames, ["한강자이", "한강자이(고층)"]);
     assert.equal(prices.complexes["100"].areas["84"].median, null);
     assert.equal(prices.complexes["101"], undefined);

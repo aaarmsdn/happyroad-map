@@ -66,10 +66,24 @@ export function median(values) {
 }
 
 export function summarize(trades) {
-  if (!trades.length) return { count: 0, min: null, median: null, max: null, medianPerPyeong: null };
+  if (!trades.length) return {
+    count: 0, min: null, average: null, median: null, max: null,
+    minPerPyeong: null, averagePerPyeong: null, medianPerPyeong: null, maxPerPyeong: null
+  };
   const amounts = trades.map(trade => trade.amount);
-  const perPyeong = trades.map(trade => Math.round(trade.amount * 3.305785 / trade.area));
-  return { count: trades.length, min: Math.min(...amounts), median: median(amounts), max: Math.max(...amounts), medianPerPyeong: median(perPyeong) };
+  const perPyeong = trades.map(trade => trade.amount * 3.305785 / trade.area);
+  const average = values => Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+  return {
+    count: trades.length,
+    min: Math.min(...amounts),
+    average: average(amounts),
+    median: median(amounts),
+    max: Math.max(...amounts),
+    minPerPyeong: Math.round(Math.min(...perPyeong)),
+    averagePerPyeong: average(perPyeong),
+    medianPerPyeong: Math.round(median(perPyeong)),
+    maxPerPyeong: Math.round(Math.max(...perPyeong))
+  };
 }
 
 export function areaBand(area) {

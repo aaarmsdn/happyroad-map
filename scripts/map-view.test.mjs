@@ -1,7 +1,70 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { routeRequestForStop } from "../public/filter-data.js";
-import { addApartmentMarkers, addRoutePaths, addStopMarkers, spreadMarkerPoints } from "../public/map-view.js";
+import { addApartmentMarkers, addStopMarkers, apartmentDirectionOpacity, stopDirectionIcon } from "../public/map-view.js";
+import { addJourneyPaths, addRoutePaths, routeSegmentPoints } from "../public/route-view.js";
+
+function encodePolyline(points) {
+  let previousLat = 0;
+  let previousLng = 0;
+  const encode = value => {
+    let shifted = value < 0 ? ~(value << 1) : value << 1;
+    let output = "";
+    while (shifted >= 0x20) { output += String.fromCharCode((0x20 | (shifted & 0x1f)) + 63); shifted >>= 5; }
+    return output + String.fromCharCode(shifted + 63);
+  };
+  return points.map(([lat, lng]) => {
+    const nextLat = Math.round(lat * 1e5);
+    const nextLng = Math.round(lng * 1e5);
+    const output = encode(nextLat - previousLat) + encode(nextLng - previousLng);
+    previousLat = nextLat;
+    previousLng = nextLng;
+    return output;
+  }).join("");
+}
+
+test("stops stay clear and expose their commute direction", () => {
+  const inbound = { entries: [{ direction: "출근", routeCategory: "이천->청주" }] };
+  const outbound = { entries: [{ direction: "퇴근", routeCategory: "이천->분당" }] };
+  const both = { entries: [{ direction: "출근", routeCategory: "기타셔틀" }, { direction: "퇴근", routeCategory: "기타셔틀" }] };
+  const other = { entries: [{ routeCategory: "기타셔틀" }] };
+  assert.equal(stopDirectionIcon(inbound), "arrow-right");
+  assert.equal(stopDirectionIcon(outbound), "arrow-left");
+  assert.equal(stopDirectionIcon(both), "arrow-left-right");
+  assert.equal(stopDirectionIcon(other), "");
+});
+
+test("rendered stop markers keep full opacity and overlay the direction arrow", () => {
+  const icons = [];
+  const L = {
+    divIcon: options => { icons.push(options.html); return options; },
+    marker: latLng => ({
+      addTo() { return this; }, bindTooltip() { return this; }, getElement() { return null; },
+      getLatLng() { return latLng; }, on() { return this; }
+    })
+  };
+  const map = {
+    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
+    getZoom: () => 15,
+    latLngToLayerPoint: () => ({ x: 0, y: 0 })
+  };
+  const stop = {
+    name: "정류장", lat: 37.5, lng: 127,
+    entries: [{ direction: "출근", routeCategory: "이천->청주", routeName: "노선" }]
+  };
+  addStopMarkers({ L, map, layer: {}, groupedStops: new Map([["1", stop]]), onSelect: () => {} });
+  assert.match(icons[0], /data-lucide="bus-front"/);
+  assert.match(icons[0], /data-lucide="arrow-right"/);
+  assert.doesNotMatch(icons[0], /opacity:/);
+});
+
+test("all-category apartments are dimmed only when one commute direction is accessible", () => {
+  assert.equal(apartmentDirectionOpacity({ accessDirections: ["출근"] }, "전체"), 0.45);
+  assert.equal(apartmentDirectionOpacity({ accessDirections: ["퇴근"] }, "전체"), 0.45);
+  assert.equal(apartmentDirectionOpacity({ accessDirections: ["출근", "퇴근"] }, "전체"), 1);
+  assert.equal(apartmentDirectionOpacity({ accessDirections: [] }, "전체"), 1);
+  assert.equal(apartmentDirectionOpacity({ accessDirections: ["출근"] }, "출근"), 1);
+});
 
 test("route paths render with a visible halo and highlight without map movement", () => {
   const lines = [];
@@ -17,174 +80,63 @@ test("route paths render with a visible halo and highlight without map movement"
   assert.ok(lines.every(line => line.options.interactive === false));
 });
 
-test("coincident cluster summaries receive separate screen positions", () => {
-  const points = spreadMarkerPoints([{ x: 10, y: 10 }, { x: 10, y: 10 }], 32, [{ x: 10, y: 10 }]);
-  assert.ok(Math.hypot(points[0].x - 10, points[0].y - 10) >= 32);
-  assert.ok(Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y) >= 32);
+test("journey shuttle paths contain only the boarded segment", () => {
+  const encoded = "_p~iF~ps|U_ulLnnqC_mqNvxq`@";
+  assert.deepEqual(routeSegmentPoints(encoded, { lat: 40.7, lng: -120.95 }, { lat: 43.252, lng: -126.453 }), [
+    [40.7, -120.95], [43.252, -126.453]
+  ]);
 });
 
-test("individual map markers keep their source coordinates", () => {
-  let placed = [];
-  const L = {
-    divIcon: options => options,
-    marker: latLng => ({
-      addTo() { placed.push(latLng); return this; },
-      bindTooltip() { return this; },
-      getElement() { return null; },
-      getLatLng() { return latLng; },
-      on() { return this; }
-    })
-  };
-  let zoom = 15;
-  const map = {
-    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
-    getZoom: () => zoom,
-    latLngToLayerPoint: () => ({ x: 0, y: 0 }),
-    layerPointToLatLng: point => [point.y, point.x]
-  };
-  const coordinates = [[37.5, 127], [37.513, 127]];
-  for (zoom of [13, 15]) {
-    placed = [];
-    const stops = new Map(coordinates.map(([lat, lng], index) => [String(index), {
-      name: `정류장${index}`, lat, lng, entries: [{ routeCategory: "출근", routeName: "노선" }]
-    }]));
-    const complexes = new Map(coordinates.map(([lat, lng], index) => [String(index), {
-      id: String(index), name: `아파트${index}`, lat, lng
-    }]));
-    addStopMarkers({ L, map, layer: {}, groupedStops: stops, onSelect: () => {} });
-    addApartmentMarkers({
-      L, map, layer: {}, visibleLinks: new Map([["0", {}], ["1", {}]]), complexById: complexes,
-      priceOf: () => null, colorOf: () => "#f04438", onSelect: () => {}
-    });
-    assert.deepEqual(placed, [...coordinates, ...coordinates], `zoom ${zoom} changed marker coordinates`);
-  }
+test("journey shuttle path follows route stop order at a self-crossing", () => {
+  const points = [[0, 0], [1, 1], [2, 2], [1, 1], [2, 0]];
+  const stops = [
+    { stopOrder: 1, lat: 0, lng: 0 },
+    { stopOrder: 2, lat: 1, lng: 1 },
+    { stopOrder: 3, lat: 2, lng: 2 },
+    { stopOrder: 4, lat: 1, lng: 1 },
+    { stopOrder: 5, lat: 2, lng: 0 }
+  ];
+  assert.deepEqual(routeSegmentPoints(encodePolyline(points), stops[1], stops[3], stops), points.slice(1, 4));
 });
 
-test("low-zoom stop cluster summaries avoid exact singleton markers", () => {
-  let placed = [];
-  const L = {
-    divIcon: options => options,
-    marker: latLng => ({
-      addTo() { placed.push(latLng); return this; },
-      bindTooltip() { return this; },
-      getElement() { return null; },
-      getLatLng() { return latLng; },
-      on() { return this; }
-    })
-  };
-  const map = {
-    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
-    getZoom: () => 13,
-    latLngToLayerPoint: ([lat, lng]) => ({ x: lng * 100, y: lat * 100 }),
-    layerPointToLatLng: ({ x, y }) => [y / 100, x / 100]
-  };
-  const coordinates = [[0.01248, 0], [0.01249, 0], [0.01251, 0]];
-  const distance = ([left, right]) => {
-    const a = map.latLngToLayerPoint(left);
-    const b = map.latLngToLayerPoint(right);
-    return Math.hypot(a.x - b.x, a.y - b.y);
-  };
-
-  const stops = new Map(coordinates.map(([lat, lng], index) => [String(index), {
-    name: `정류장${index}`, lat, lng, entries: [{ routeCategory: "출근", routeName: "노선" }]
-  }]));
-  addStopMarkers({ L, map, layer: {}, groupedStops: stops, onSelect: () => {} });
-  assert.ok(distance(placed) >= 42, `stop summary is only ${distance(placed)}px from singleton`);
+test("ordered stop mapping avoids a locally nearest vertex that strands the next stop", () => {
+  const points = [[0, 0], [0, 0], [10, 0], [0.1, 0], [20, 0]];
+  const stops = [
+    { stopOrder: 1, lat: 0.1, lng: 0 },
+    { stopOrder: 2, lat: 10, lng: 0 },
+    { stopOrder: 3, lat: 20, lng: 0 }
+  ];
+  assert.deepEqual(routeSegmentPoints(encodePolyline(points), stops[1], stops[2], stops), points.slice(2));
 });
 
-test("apartment clusters use a real complex coordinate and average per-pyeong color", () => {
-  const placed = [];
-  const icons = [];
-  const tooltips = [];
-  const colorInputs = [];
-  const L = {
-    divIcon: options => { icons.push(options.html); return options; },
-    marker: latLng => ({
-      addTo() { placed.push(latLng); return this; },
-      bindTooltip(label) { tooltips.push(label); return this; },
-      getElement() { return null; },
-      getLatLng() { return latLng; },
-      on() { return this; }
-    })
-  };
-  const map = {
-    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
-    getZoom: () => 13,
-    setView() {},
-    latLngToLayerPoint: ([lat, lng]) => ({ x: lng * 100, y: lat * 100 })
-  };
-  const coordinates = [[37.5, 127], [37.501, 127.001], [37.502, 127.002]];
-  const complexes = new Map(coordinates.map(([lat, lng], index) => [String(index), {
-    id: String(index), name: `아파트${index}`, lat, lng
-  }]));
-  addApartmentMarkers({
-    L, map, layer: {}, visibleLinks: new Map([["0", {}], ["1", {}], ["2", {}]]), complexById: complexes,
-    priceOf: () => null,
-    perPyeongOf: id => ({ "0": 2000, "1": 4000, "2": 6000 })[id],
-    colorOf: value => { colorInputs.push(value); return "#2774ae"; },
-    onSelect: () => {}
+test("journey segment rejects a materially distant source geometry endpoint", () => {
+  const points = [[37.5, 127], [37.6, 127.1]];
+  const start = { stopOrder: 1, lat: 37.45, lng: 126.95 };
+  const end = { stopOrder: 2, lat: 37.65, lng: 127.15 };
+  assert.deepEqual(routeSegmentPoints(encodePolyline(points), start, end, [start, end]), []);
+});
+
+test("journey segment snaps a nearby source geometry endpoint to the stop", () => {
+  const points = [[37.5, 127], [37.6, 127.1]];
+  const start = { stopOrder: 1, lat: 37.499, lng: 126.999 };
+  const end = { stopOrder: 2, lat: 37.601, lng: 127.101 };
+  const segment = routeSegmentPoints(encodePolyline(points), start, end, [start, end]);
+  assert.deepEqual(segment[0], [start.lat, start.lng]);
+  assert.deepEqual(segment.at(-1), [end.lat, end.lng]);
+});
+
+test("journey paths use mode color for access and purple for the shuttle segment", () => {
+  const lines = [];
+  const L = { polyline: (points, options) => ({ addTo() { lines.push({ points, options }); return this; } }) };
+  const rendered = addJourneyPaths({
+    L, layer: {}, path: { encoded: "_p~iF~ps|U_ulLnnqC_mqNvxq`@" },
+    start: { lat: 38.5, lng: -120.2 }, end: { lat: 43.252, lng: -126.453 },
+    accessMode: "public-transit", accessPoints: [[37.5, 127], [37.51, 127.01]],
+    accessConnectors: [[[37.49, 126.99], [37.5, 127]]]
   });
-  assert.deepEqual(placed, [[37.501, 127.001]]);
-  assert.deepEqual(colorInputs, [4000]);
-  assert.match(icons[0], /--marker-color:#2774ae/);
-  assert.equal(tooltips[0], "아파트 3단지 · 평균 평당 4,000만");
-});
-
-test("a co-located stop remains the primary pointer target", () => {
-  const options = [];
-  const L = {
-    divIcon: value => value,
-    marker: (latLng, markerOptions) => ({
-      addTo() { options.push(markerOptions); return this; },
-      bindTooltip() { return this; },
-      getElement() { return null; },
-      getLatLng() { return latLng; },
-      on() { return this; }
-    })
-  };
-  const map = {
-    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
-    getZoom: () => 15,
-    latLngToLayerPoint: () => ({ x: 0, y: 0 })
-  };
-  const stop = { name: "정류장", lat: 37.5, lng: 127, entries: [{ routeName: "노선", routeCategory: "퇴근" }] };
-  const complex = { id: "1", name: "아파트", lat: 37.5, lng: 127 };
-
-  addStopMarkers({ L, map, layer: {}, groupedStops: new Map([["1", stop]]), onSelect: () => {} });
-  addApartmentMarkers({
-    L, map, layer: {}, visibleLinks: new Map([["1", {}]]), complexById: new Map([["1", complex]]),
-    priceOf: () => 10000, colorOf: () => "#f04438", onSelect: () => {}
-  });
-  assert.ok(options[0].zIndexOffset > options[1].zIndexOffset);
-});
-
-test("a co-located apartment remains above a low-zoom stop summary", () => {
-  const options = [];
-  const L = {
-    divIcon: value => value,
-    marker: (latLng, markerOptions) => ({
-      addTo() { options.push(markerOptions); return this; },
-      bindTooltip() { return this; },
-      getElement() { return null; },
-      getLatLng() { return latLng; },
-      on() { return this; }
-    })
-  };
-  const map = {
-    getBounds: () => ({ pad: () => ({ contains: () => true }) }),
-    getZoom: () => 13,
-    latLngToLayerPoint: ([lat, lng]) => ({ x: lng, y: lat }),
-    layerPointToLatLng: ({ x, y }) => [y, x]
-  };
-  const stop = index => ({ name: `정류장${index}`, lat: 37.5, lng: 127, entries: [{ routeName: "노선", routeCategory: "퇴근" }] });
-  const complex = { id: "1", name: "아파트", lat: 37.5, lng: 127 };
-
-  addStopMarkers({ L, map, layer: {}, groupedStops: new Map([["1", stop(1)], ["2", stop(2)]]), onSelect: () => {} });
-  addApartmentMarkers({
-    L, map, layer: {}, visibleLinks: new Map([["1", {}]]), complexById: new Map([["1", complex]]),
-    priceOf: () => 10000, colorOf: () => "#f04438", onSelect: () => {}
-  });
-  assert.ok(options[0].zIndexOffset < options[1].zIndexOffset);
+  assert.equal(rendered, 3);
+  assert.deepEqual(lines.filter(line => line.options.weight === 6).map(line => line.options.color), ["#2774ae", "#7d4cc2"]);
+  assert.equal(lines.find(line => line.options.weight === 3).options.dashArray, "5 7");
 });
 
 test("a selected stop chooses its first routable entry allowed by every shuttle filter", () => {
@@ -207,7 +159,7 @@ test("a selected stop chooses its first routable entry allowed by every shuttle 
   for (const [state, expected] of cases) assert.deepEqual(routeRequestForStop(stop, paths, state), expected);
 });
 
-test("apartment markers render sub-100-million-won prices in ten-thousand-won units", () => {
+test("apartment markers render prices and one-direction opacity", () => {
   const iconHtml = [];
   const colorInputs = [];
   const L = {
@@ -227,7 +179,7 @@ test("apartment markers render sub-100-million-won prices in ten-thousand-won un
     layerPointToLatLng: () => [37.5, 127]
   };
   addApartmentMarkers({
-    L, map, layer: {}, visibleLinks: new Map([["1", {}]]),
+    L, map, layer: {}, category: "전체", visibleLinks: new Map([["1", { accessDirections: ["출근"] }]]),
     complexById: new Map([["1", { id: "1", name: "단지", lat: 37.5, lng: 127 }]]),
     priceOf: () => 8500,
     perPyeongOf: () => 3306,
@@ -235,6 +187,7 @@ test("apartment markers render sub-100-million-won prices in ten-thousand-won un
     onSelect: () => {}
   });
   assert.match(iconHtml.join(""), />8,500만</);
+  assert.match(iconHtml.join(""), /opacity:0\.45/);
   assert.deepEqual(colorInputs, [3306]);
 });
 
@@ -261,13 +214,4 @@ test("apartment markers expose per-pyeong prices when selected areas have no tra
     priceOf: () => null, perPyeongOf: () => 4474, colorOf: () => "#d6a01d", onSelect: () => {}
   });
   assert.equal(tooltips[0], "단지 · 평당 4,474만");
-});
-
-test("dense coincident cluster summaries never overlap", () => {
-  const points = spreadMarkerPoints(Array.from({ length: 100 }, () => ({ x: 0, y: 0 })));
-  for (let left = 0; left < points.length; left += 1) {
-    for (let right = left + 1; right < points.length; right += 1) {
-      assert.ok(Math.hypot(points[left].x - points[right].x, points[left].y - points[right].y) >= 32);
-    }
-  }
 });

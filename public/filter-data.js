@@ -1,4 +1,4 @@
-import { hourOf } from "./filter-logic.js?v=7";
+import { hourOf } from "./filter-logic.js?v=9";
 import { normalize } from "./ui-utils.js?v=10";
 
 export function entryMatches(entry, state) {
@@ -19,17 +19,94 @@ export function routeRequestForStop(stop, paths, state) {
   return entry ? { uidKey: entry.uidKey, routeName: entry.routeName } : null;
 }
 
-export function matchingApartmentLinks(links, state, routeNames, complexById) {
+export function directionsByStation(entries) {
   const result = new Map();
+  for (const entry of entries) {
+    if (!entry.stationUid) continue;
+    if (!result.has(entry.stationUid)) result.set(entry.stationUid, new Set());
+    if (entry.direction === "출근" || entry.direction === "퇴근") result.get(entry.stationUid).add(entry.direction);
+  }
+  return result;
+}
+
+function shuttleClockMinutes(value) {
+  const match = String(value || "").match(/^(\d{1,2}):(\d{2})/);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : Number.MAX_SAFE_INTEGER;
+}
+
+function adjustedClock(value, offset = 0) {
+  const minutes = shuttleClockMinutes(value);
+  if (!Number.isFinite(minutes) || minutes === Number.MAX_SAFE_INTEGER) return null;
+  const normalized = ((minutes + offset) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(normalized % 60).padStart(2, "0")}`;
+}
+
+function closestTimedEntry(entries, targetMinutes) {
+  return entries.slice().sort((left, right) => Math.abs(shuttleClockMinutes(left.companyTime) - targetMinutes) - Math.abs(shuttleClockMinutes(right.companyTime) - targetMinutes))[0];
+}
+
+export function apartmentStopTimings(entries) {
+  const valid = (category, field) => entries.filter(entry => {
+    const minutes = entry[field] === null || entry[field] === "" || entry[field] === undefined ? NaN : Number(entry[field]);
+    return (entry.direction || entry.routeCategory) === category && Number.isFinite(minutes) && minutes >= 0;
+  });
+  const inbound = valid("출근", "minutesToCompany");
+  const outbound = valid("퇴근", "minutesFromCompany");
+  const normalInbound = closestTimedEntry(inbound.filter(entry => String(entry.turnName).includes("통상 출근")), 8 * 60);
+  const normalOutbound = closestTimedEntry(outbound.filter(entry => String(entry.turnName).includes("통상 18시퇴근")), 18 * 60);
+  const selectedInbound = normalInbound || closestTimedEntry(inbound, 8 * 60);
+  const selectedOutbound = normalOutbound || closestTimedEntry(outbound, 18 * 60);
+  const fallbacks = [];
+  if (selectedInbound && !normalInbound) fallbacks.push(selectedInbound.turnName || selectedInbound.routeName);
+  if (selectedOutbound && !normalOutbound) fallbacks.push(selectedOutbound.turnName || selectedOutbound.routeName);
+  const fallbackNames = [...new Set(fallbacks.filter(Boolean))];
+  const inboundMinutes = selectedInbound ? Math.round(Number(selectedInbound.minutesToCompany)) : null;
+  const outboundMinutes = selectedOutbound ? Math.round(Number(selectedOutbound.minutesFromCompany)) : null;
+  const inboundCompanyAt = selectedInbound ? adjustedClock(selectedInbound.companyTime) : null;
+  const outboundCompanyAt = selectedOutbound ? adjustedClock(selectedOutbound.companyTime) : null;
+  return {
+    inboundMinutes,
+    outboundMinutes,
+    inboundStopAt: selectedInbound ? adjustedClock(selectedInbound.time) || adjustedClock(selectedInbound.companyTime, -inboundMinutes) : null,
+    inboundCompanyAt,
+    outboundCompanyAt,
+    outboundStopAt: selectedOutbound ? adjustedClock(selectedOutbound.time) || adjustedClock(selectedOutbound.companyTime, outboundMinutes) : null,
+    fallbackLabel: fallbackNames.length ? `${fallbackNames.join(" · ")} 기준` : ""
+  };
+}
+
+export function apartmentDoorTimes(timing, distanceKm) {
+  const walking = Number.isFinite(Number(distanceKm)) ? Math.max(0, Math.ceil(Number(distanceKm) * 12.5)) : 0;
+  return {
+    leaveHomeAt: timing.inboundStopAt ? adjustedClock(timing.inboundStopAt, -walking) : null,
+    arriveHomeAt: timing.outboundStopAt ? adjustedClock(timing.outboundStopAt, walking) : null
+  };
+}
+
+export function stopRepresentativeMinutes(entries) {
+  const timing = apartmentStopTimings(entries);
+  const values = [timing.inboundMinutes, timing.outboundMinutes].filter(Number.isFinite);
+  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+}
+
+export function matchingApartmentLinks(links, state, stationDirections, complexById) {
+  const result = new Map();
+  if (!state.area) return result;
   for (const link of links) {
     if (link.distanceKm > state.distance) continue;
     if (state.travelTime && (!link.travelMinutes || link.travelMinutes > state.travelTime)) continue;
-    if (link.routes.length && !link.routes.some(route => routeNames.has(route))) continue;
+    if (!stationDirections.has(link.stationId)) continue;
     const complex = complexById.get(link.complexId);
     if (!complex || complex.households < state.households) continue;
     if (state.area !== "전체" && !complex.areaTags.includes(state.area)) continue;
     const previous = result.get(link.complexId);
-    if (!previous || link.distanceKm < previous.distanceKm) result.set(link.complexId, link);
+    const directions = new Set(previous?.accessDirections);
+    for (const direction of stationDirections.get(link.stationId)) directions.add(direction);
+    const nearest = !previous || link.distanceKm < previous.distanceKm ? link : previous;
+    result.set(link.complexId, {
+      ...nearest,
+      accessDirections: ["출근", "퇴근"].filter(direction => directions.has(direction))
+    });
   }
   return result;
 }
@@ -48,17 +125,32 @@ export function priceRecordForDisplay(prices, complexId, expectedRegionCode) {
 function pricePointFor(prices, state, complexId, expectedRegionCode) {
   const record = priceRecordForDisplay(prices, complexId, expectedRegionCode);
   if (!record) return null;
+  const metric = priceMetric(state.priceMetric);
   const areas = state.area === "전체" ? ["84", "59", "102", "115"] : [state.area];
   for (const area of areas) {
     const data = record.areas?.[area];
-    const median = Number(data?.median);
-    if (median > 0) return { area: Number(area), median, perPyeong: Number(data?.medianPerPyeong) || pricePerPyeong(median, area) };
+    const amount = transactionPrice(data, metric);
+    if (amount) return { area: Number(area), amount, perPyeong: transactionPricePerPyeong(data, area, metric) };
   }
   return null;
 }
 
 export function priceFor(prices, state, complexId, expectedRegionCode) {
-  return pricePointFor(prices, state, complexId, expectedRegionCode)?.median ?? null;
+  if (state.area === "전체") {
+    const record = priceRecordForDisplay(prices, complexId, expectedRegionCode);
+    const metric = priceMetric(state.priceMetric);
+    const exact = transactionPrice(record, metric);
+    if (exact) return exact;
+    const groups = Object.entries(record?.areas || {}).map(([, data]) => {
+      return { count: Number(data?.count) || 0, value: transactionPrice(data, metric) };
+    }).filter(group => group.count > 0 && group.value);
+    if (!groups.length) return null;
+    if (metric === "max") return Math.max(...groups.map(group => group.value));
+    if (metric === "min") return Math.min(...groups.map(group => group.value));
+    const count = groups.reduce((sum, group) => sum + group.count, 0);
+    return Math.round(groups.reduce((sum, group) => sum + group.value * group.count, 0) / count);
+  }
+  return pricePointFor(prices, state, complexId, expectedRegionCode)?.amount ?? null;
 }
 
 export function pricePerPyeong(amount, area) {
@@ -67,19 +159,37 @@ export function pricePerPyeong(amount, area) {
   return price > 0 && squareMeters > 0 ? Math.round(price * 3.305785 / squareMeters) : null;
 }
 
+export function priceMetric(value) {
+  return ["max", "average", "min"].includes(value) ? value : "max";
+}
+
+export function transactionPrice(data, metricValue = "max") {
+  const metric = priceMetric(metricValue);
+  const value = Number(data?.[metric]);
+  return value > 0 ? value : null;
+}
+
+export function transactionPricePerPyeong(data, area, metricValue = "max") {
+  const metric = priceMetric(metricValue);
+  const exact = Number(data?.[`${metric}PerPyeong`]);
+  if (exact > 0) return exact;
+  return pricePerPyeong(transactionPrice(data, metric), area);
+}
+
 export function pricePerPyeongFor(prices, state, complexId, expectedRegionCode) {
   if (state.area === "전체") {
     const record = priceRecordForDisplay(prices, complexId, expectedRegionCode);
-    const exactMedian = Number(record?.medianPerPyeong);
-    if (exactMedian > 0) return exactMedian;
-    const groups = ["59", "84", "102", "115"].map(area => {
-      const data = record?.areas?.[area];
-      return { count: Number(data?.count) || 0, value: Number(data?.medianPerPyeong) || pricePerPyeong(data?.median, area) };
-    }).filter(group => group.count > 0 && group.value).sort((left, right) => left.value - right.value);
+    const metric = priceMetric(state.priceMetric);
+    const exact = Number(record?.[`${metric}PerPyeong`]);
+    if (exact > 0) return exact;
+    const groups = Object.entries(record?.areas || {}).map(([area, data]) => {
+      return { count: Number(data?.count) || 0, value: transactionPricePerPyeong(data, area, metric) };
+    }).filter(group => group.count > 0 && group.value);
     const total = groups.reduce((sum, group) => sum + group.count, 0);
     if (!total) return null;
-    const valueAt = index => groups.find((group, position) => index < groups.slice(0, position + 1).reduce((sum, item) => sum + item.count, 0)).value;
-    return total % 2 ? valueAt(Math.floor(total / 2)) : Math.round((valueAt(total / 2 - 1) + valueAt(total / 2)) / 2);
+    if (metric === "max") return Math.max(...groups.map(group => group.value));
+    if (metric === "min") return Math.min(...groups.map(group => group.value));
+    return Math.round(groups.reduce((sum, group) => sum + group.value * group.count, 0) / total);
   }
   const point = pricePointFor(prices, state, complexId, expectedRegionCode);
   return point?.perPyeong ?? null;

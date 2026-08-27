@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "scripts/refresh-prices.mjs"
+      - "scripts/price-refresh-lib.mjs"
       - "config/price-name-aliases.json"
       - ".github/workflows/refresh-prices.yml"
   schedule:

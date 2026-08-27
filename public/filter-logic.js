@@ -23,7 +23,8 @@ export function restoreFilters(state, saved) {
     if (typeof saved[key] === "string") state[key] = saved[key];
   }
   if (["전체", "출근", "퇴근", "기타셔틀", "사내셔틀"].includes(saved.category)) state.category = saved.category;
-  if (["전체", "59", "84", "102", "115"].includes(saved.area)) state.area = saved.area;
+  if (["", "전체", "59", "84", "102", "115"].includes(saved.area)) state.area = saved.area;
+  if (["max", "average", "min"].includes(saved.priceMetric)) state.priceMetric = saved.priceMetric;
   if (saved.startHour === "" || /^(0\d|1\d|2[0-3])$/.test(saved.startHour)) state.startHour = saved.startHour;
   if (Number.isFinite(saved.distance)) state.distance = Math.min(1.5, Math.max(0.2, saved.distance));
   if (Number.isFinite(saved.households)) state.households = Math.max(0, saved.households);

@@ -1,4 +1,5 @@
 import { escapeHtml, formatPrice } from "./ui-utils.js?v=10";
+import { stopRepresentativeMinutes } from "./filter-data.js?v=32";
 
 function clusterItems(items, pointOf, cellSize) {
   const buckets = new Map();
@@ -14,13 +15,21 @@ function clusterItems(items, pointOf, cellSize) {
   return [...buckets.values()].map(bucket => ({ ...bucket, lat: bucket.lat / bucket.items.length, lng: bucket.lng / bucket.items.length }));
 }
 
+export function stopTimeColor(minutes) {
+  if (!Number.isFinite(minutes)) return "#7d4cc2";
+  if (minutes < 30) return "#18864b";
+  if (minutes < 60) return "#2774ae";
+  if (minutes < 90) return "#d6a01d";
+  if (minutes < 120) return "#f07835";
+  return "#d83a3a";
+}
+
+function markerInk(color) {
+  return ["#d6a01d", "#f07835"].includes(color) ? "#14213d" : "#ffffff";
+}
+
 function stopColor(stop) {
-  if (stop.entries.some(entry => entry.isCompany)) return "#f04438";
-  const categories = new Set(stop.entries.map(entry => entry.routeCategory));
-  if (categories.has("출근")) return "#2774ae";
-  if (categories.has("퇴근")) return "#18864b";
-  if (categories.has("사내셔틀")) return "#7d4cc2";
-  return "#ff8a1f";
+  return stopTimeColor(stopRepresentativeMinutes(stop.entries));
 }
 
 function compactPrice(value) {
@@ -72,19 +81,36 @@ function addAccessibleMarker(marker, layer, label) {
   });
 }
 
+export function stopDirectionIcon(stop) {
+  const directions = new Set(stop.entries.map(entry => entry.direction));
+  if (directions.has("출근") && directions.has("퇴근")) return "arrow-left-right";
+  if (directions.has("출근")) return "arrow-right";
+  if (directions.has("퇴근")) return "arrow-left";
+  return "";
+}
+
+export function apartmentDirectionOpacity(link, category) {
+  if (category !== "전체") return 1;
+  const directions = new Set(link?.accessDirections);
+  if (!directions.has("출근") && !directions.has("퇴근")) return 1;
+  return directions.has("출근") && directions.has("퇴근") ? 1 : 0.45;
+}
+
 function stopIcon(L, stop) {
-  return markerIcon(L, `<span class="map-marker stop-marker" style="--route-color:${stopColor(stop)}"><i data-lucide="bus-front"></i></span>`, [44, 44]);
+  const directionIcon = stopDirectionIcon(stop);
+  const direction = directionIcon ? `<span class="stop-direction" aria-hidden="true"><i data-lucide="${directionIcon}"></i></span>` : "";
+  return markerIcon(L, `<span class="map-marker stop-marker${directionIcon ? " has-direction" : ""}" style="--route-color:${stopColor(stop)}"><i data-lucide="bus-front"></i>${direction}</span>`, [44, 44]);
 }
 
-function apartmentIcon(L, color) {
-  return markerIcon(L, `<span class="map-marker apartment-marker" style="--marker-color:${color}"><i data-lucide="building-2"></i></span>`, [44, 44]);
+function apartmentIcon(L, color, opacity) {
+  return markerIcon(L, `<span class="map-marker apartment-marker" style="--marker-color:${color};opacity:${opacity}"><i data-lucide="building-2"></i></span>`, [44, 44]);
 }
 
-function apartmentPriceIcon(L, value, color) {
+function apartmentPriceIcon(L, value, color, opacity) {
   const label = compactPrice(value);
   return label
-    ? markerIcon(L, `<span class="apartment-price-marker" style="--marker-color:${color}"><i data-lucide="building-2"></i><b>${label}</b></span>`, [66, 44])
-    : apartmentIcon(L, color);
+    ? markerIcon(L, `<span class="apartment-price-marker" style="--marker-color:${color};opacity:${opacity}"><i data-lucide="building-2"></i><b>${label}</b></span>`, [66, 44])
+    : apartmentIcon(L, color, opacity);
 }
 
 export function groupStops(entries) {
@@ -117,8 +143,11 @@ export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
     for (const cluster of clusters) {
       if (cluster.items.length > 1) {
         const size = Math.min(42, 25 + Math.log2(cluster.items.length) * 3);
-        const marker = L.marker(map.layerPointToLatLng(summaryPoints[summaryIndex++]), { icon: markerIcon(L, `<span class="map-cluster stop-cluster" style="--cluster-size:${size}px"><i data-lucide="bus-front"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 100 });
-        marker.bindTooltip(`정류장 ${cluster.items.length.toLocaleString("ko-KR")}개`, { direction: "top" });
+        const times = cluster.items.map(stop => stopRepresentativeMinutes(stop.entries)).filter(Number.isFinite);
+        const average = times.length ? Math.round(times.reduce((sum, value) => sum + value, 0) / times.length) : null;
+        const clusterColor = stopTimeColor(average);
+        const marker = L.marker(map.layerPointToLatLng(summaryPoints[summaryIndex++]), { icon: markerIcon(L, `<span class="map-cluster stop-cluster" style="--cluster-size:${size}px;--route-color:${clusterColor};--cluster-ink:${markerInk(clusterColor)}"><i data-lucide="bus-front"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 100 });
+        marker.bindTooltip(`정류장 ${cluster.items.length.toLocaleString("ko-KR")}개${Number.isFinite(average) ? ` · 평균 ${average}분` : ""}`, { direction: "top" });
         marker.on("click", () => map.setView([cluster.lat, cluster.lng], Math.min(14, map.getZoom() + 2)));
         addAccessibleMarker(marker, layer, `정류장 ${cluster.items.length.toLocaleString("ko-KR")}개`);
         renderedPoints.push(map.latLngToLayerPoint(marker.getLatLng()));
@@ -143,7 +172,7 @@ export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
   return renderedPoints;
 }
 
-export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, priceOf, perPyeongOf = () => null, colorOf, onSelect, occupiedPoints = [] }) {
+export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, priceOf, perPyeongOf = () => null, colorOf, onSelect, category, occupiedPoints = [] }) {
   const bounds = map.getBounds().pad(0.2);
   const items = [...visibleLinks]
     .map(([complexId, link]) => ({ complex: complexById.get(complexId), link }))
@@ -161,62 +190,32 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
         }, { item: cluster.items[0], distance: Infinity }).item;
         const prices = cluster.items.map(item => perPyeongOf(item.complex.id)).filter(value => Number.isFinite(value) && value > 0);
         const averagePerPyeong = prices.length ? Math.round(prices.reduce((sum, value) => sum + value, 0) / prices.length) : null;
+        const opacity = cluster.items.reduce((sum, item) => sum + apartmentDirectionOpacity(item.link, category), 0) / cluster.items.length;
         const label = `아파트 ${cluster.items.length.toLocaleString("ko-KR")}단지${averagePerPyeong ? ` · 평균 평당 ${averagePerPyeong.toLocaleString("ko-KR")}만` : ""}`;
-        const marker = L.marker([representative.complex.lat, representative.complex.lng], { icon: markerIcon(L, `<span class="map-cluster apartment-cluster" style="--cluster-size:${size}px;--marker-color:${colorOf(averagePerPyeong)}"><i data-lucide="building-2"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 200 });
+        const clusterColor = colorOf(averagePerPyeong);
+        const marker = L.marker([representative.complex.lat, representative.complex.lng], { icon: markerIcon(L, `<span class="map-cluster apartment-cluster" style="--cluster-size:${size}px;--marker-color:${clusterColor};--cluster-ink:${markerInk(clusterColor)};opacity:${opacity}"><i data-lucide="building-2"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 200 });
         marker.bindTooltip(label, { direction: "top" });
         marker.on("click", () => map.setView([representative.complex.lat, representative.complex.lng], Math.min(14, map.getZoom() + 2)));
         addAccessibleMarker(marker, layer, label);
         continue;
       }
-      const median = priceOf(single.complex.id);
+      const price = priceOf(single.complex.id);
       const perPyeong = perPyeongOf(single.complex.id);
-      const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, median, colorOf(perPyeong)), zIndexOffset: 200 });
-      marker.bindTooltip(`${escapeHtml(single.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}`, { direction: "top" });
+      const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, price, colorOf(perPyeong), apartmentDirectionOpacity(single.link, category)), zIndexOffset: 200 });
+      marker.bindTooltip(`${escapeHtml(single.complex.name)}${price ? ` · ${formatPrice(price)}` : ""}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}`, { direction: "top" });
       marker.on("click", () => onSelect(single.complex, single.link));
       addAccessibleMarker(marker, layer, single.complex.name);
     }
     return;
   }
   items.forEach(item => {
-    const median = priceOf(item.complex.id);
+    const price = priceOf(item.complex.id);
     const perPyeong = perPyeongOf(item.complex.id);
     const color = colorOf(perPyeong);
-    const icon = apartmentPriceIcon(L, median, color);
+    const icon = apartmentPriceIcon(L, price, color, apartmentDirectionOpacity(item.link, category));
     const marker = L.marker([item.complex.lat, item.complex.lng], { icon, zIndexOffset: 200 });
-    marker.bindTooltip(`${escapeHtml(item.complex.name)}${median ? ` · ${formatPrice(median)}` : ""}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}`, { direction: "top" });
+    marker.bindTooltip(`${escapeHtml(item.complex.name)}${price ? ` · ${formatPrice(price)}` : ""}${perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : ""}`, { direction: "top" });
     marker.on("click", () => onSelect(item.complex, item.link));
     addAccessibleMarker(marker, layer, item.complex.name);
   });
-}
-
-export function decodePolyline(encoded) {
-  const points = [];
-  let index = 0;
-  let lat = 0;
-  let lng = 0;
-  while (index < encoded.length) {
-    let result = 0;
-    let shift = 0;
-    let byte;
-    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
-    lat += result & 1 ? ~(result >> 1) : result >> 1;
-    result = 0;
-    shift = 0;
-    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
-    lng += result & 1 ? ~(result >> 1) : result >> 1;
-    points.push([lat / 1e5, lng / 1e5]);
-  }
-  return points;
-}
-
-export function addRoutePaths({ L, layer, paths }) {
-  let rendered = 0;
-  for (const path of paths) {
-    const points = decodePolyline(path.encoded);
-    if (!points.length) continue;
-    L.polyline(points, { color: "#ffffff", weight: 10, opacity: 0.94, interactive: false }).addTo(layer);
-    L.polyline(points, { color: "#7d4cc2", weight: 6, opacity: 1, interactive: false }).addTo(layer);
-    rendered += 1;
-  }
-  return rendered;
 }

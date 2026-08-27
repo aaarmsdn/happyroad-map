@@ -35,7 +35,9 @@ npm start
 
 ## GitHub Pages 배포
 
-저장소 `Settings > Pages > Build and deployment > Source`에서 `GitHub Actions`를 선택합니다. `main`에 앱이나 갱신 가격이 푸시되면 `.github/workflows/deploy-pages.yml`이 `public` 폴더를 자동 배포합니다. 배포용 API 키는 필요 없습니다.
+저장소 `Settings > Pages > Build and deployment > Source`에서 `GitHub Actions`를 선택합니다. `main`에 앱이나 갱신 가격이 푸시되면 `.github/workflows/deploy-pages.yml`이 `public` 폴더를 자동 배포합니다. 정적 지도 배포 자체에는 API 키가 필요 없습니다.
+
+장소 검색과 택시·대중교통·도보 길찾기는 별도 Cloudflare Worker를 사용합니다. 카카오디벨로퍼스의 REST API 키를 `KAKAO_REST_API_KEY` Worker secret으로 등록하고 배포 주소를 `public/index.html`의 `commute-api-base`에 넣습니다. JavaScript 키나 SDK 도메인은 사용하지 않습니다. 명령과 보안 설정은 [`worker/README.md`](./worker/README.md)를 따릅니다.
 
 ## 데이터 갱신 규칙
 

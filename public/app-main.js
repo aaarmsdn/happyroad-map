@@ -1,8 +1,11 @@
-import { bindEvents } from "./app-events.js?v=14";
-import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=20";
-import { entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, pricePerPyeongFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=22";
-import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "./filter-logic.js?v=7";
-import { addApartmentMarkers, addRoutePaths, addStopMarkers, groupStops } from "./map-view.js?v=31";
+import { bindEvents } from "./app-events.js?v=18";
+import { locateUser, populateFilterOptions, resetApp } from "./app-actions.js?v=2";
+import { createCommutePlanner } from "./commute-controller.js?v=41";
+import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=33";
+import { apartmentDoorTimes, apartmentStopTimings, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, pricePerPyeongFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=32";
+import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=9";
+import { addApartmentMarkers, addStopMarkers, groupStops } from "./map-view.js?v=41";
+import { addRoutePaths } from "./route-view.js?v=4";
 import { searchResults, searchResultsHtml } from "./search-view.js?v=10";
 import { escapeHtml, formatDate } from "./ui-utils.js?v=10";
 
@@ -11,7 +14,7 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const shuttle = window.HAPPYROAD_MAP_DATA;
 const state = {
   category: "전체", route: "전체", routeType: "전체", startHour: "", routeQuery: "",
-  area: "전체", distance: 1.5, households: 200, travelTime: null,
+  area: "전체", priceMetric: "max", distance: 1.5, households: 200, travelTime: null,
   showStops: true, showApartments: true, priceColors: true
 };
 function storedFilters() {
@@ -30,10 +33,13 @@ let stopLayer;
 let apartmentLayer;
 let routeLayer;
 let locationLayer;
+let commuteLayer;
 let visibleLinks = new Map();
 let toastTimer;
 let storageWarningShown = false;
 let detailReturnFocus;
+let selectedApartmentDetail;
+let commutePlanner;
 const complexById = new Map();
 const linksByComplex = new Map();
 const stations = new Map();
@@ -46,8 +52,21 @@ function showToast(message) {
 }
 
 function syncControls() {
-  $$("#categoryChips .chip").forEach(button => button.classList.toggle("active", button.dataset.category === state.category));
-  $$("#areaChips .chip").forEach(button => button.classList.toggle("active", button.dataset.area === state.area));
+  $$("#categoryChips .chip").forEach(button => {
+    const active = button.dataset.category === state.category;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  $$("#areaChips .chip").forEach(button => {
+    const active = button.dataset.area === state.area;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  $$("#priceMetricControl .segment").forEach(button => {
+    const active = button.dataset.priceMetric === state.priceMetric;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
   $("#routeQuery").value = state.routeQuery;
   $("#routeTypeSelect").value = state.routeType;
   $("#startHourSelect").value = state.startHour;
@@ -70,6 +89,7 @@ function updateRouteOptions() {
 function clearRoute() {
   routeLayer?.clearLayers();
   $("#map").dataset.routeVisible = "false";
+  delete $("#map").dataset.routeKey;
 }
 
 function renderMap() {
@@ -77,16 +97,20 @@ function renderMap() {
   const entries = filteredEntries(shuttle.entries, state);
   const stops = groupStops(entries);
   const routeNames = new Set(entries.map(entry => entry.routeName));
-  visibleLinks = matchingApartmentLinks(apartments.links, state, routeNames, complexById);
+  visibleLinks = matchingApartmentLinks(apartments.links, state, directionsByStation(entries), complexById);
   stopLayer.clearLayers();
   apartmentLayer.clearLayers();
-  const occupiedPoints = state.showStops ? addStopMarkers({ L, map, layer: stopLayer, groupedStops: stops, onSelect: openStopDetail }) : [];
+  const occupiedPoints = state.showStops ? addStopMarkers({
+    L, map, layer: stopLayer, groupedStops: stops,
+    onSelect: stop => commutePlanner?.pickMapPoint(stop, stop.name) || openStopDetail(stop)
+  }) : [];
   if (state.showApartments) addApartmentMarkers({
     L, map, layer: apartmentLayer, visibleLinks, complexById,
     priceOf: id => priceFor(prices, state, id, complexById.get(id)?.regionCode),
     perPyeongOf: id => pricePerPyeongFor(prices, state, id, complexById.get(id)?.regionCode),
     colorOf: value => priceColor(state, value),
-    onSelect: openApartmentDetail,
+    onSelect: (complex, link) => commutePlanner?.pickMapPoint(complex, complex.name) || openApartmentDetail(complex, link),
+    category: state.category,
     occupiedPoints
   });
   $("#stopCount").textContent = `${stops.size.toLocaleString("ko-KR")}개`;
@@ -114,37 +138,76 @@ function openDetail(html) {
   $("#detailCloseButton").focus({ preventScroll: true });
 }
 
-function closeDetail() {
+function closeDetail(restoreCommute = true) {
   const panel = $("#detailPanel");
   panel.classList.remove("open");
   panel.inert = true;
   panel.setAttribute("aria-hidden", "true");
   if (detailReturnFocus?.isConnected) detailReturnFocus.focus();
   detailReturnFocus = null;
+  selectedApartmentDetail = null;
+  if (restoreCommute) commutePlanner?.restoreMapDetail();
 }
 
 function openStopDetail(stop) {
+  const commutePeek = commutePlanner?.beginMapDetail();
+  selectedApartmentDetail = null;
   openDetail(stopDetailHtml(stop));
-  const route = routeRequestForStop(stop, shuttle.paths, state);
-  if (route) showRoute(route);
+  if (!commutePeek) {
+    const route = routeRequestForStop(stop, shuttle.paths, state);
+    if (route) showRoute(route);
+  }
+}
+
+function selectedApartmentDetailHtml() {
+  if (!selectedApartmentDetail) return "";
+  const { complex, nearestLink } = selectedApartmentDetail;
+  return apartmentDetailHtml({
+    complex, nearestLink,
+    relatedLinks: (linksByComplex.get(complex.id) || []).slice().sort((a, b) => a.distanceKm - b.distanceKm).map(link => {
+      const stop = stations.get(link.stationId);
+      const timing = apartmentStopTimings(stop?.entries || []);
+      return { ...link, ...timing, ...apartmentDoorTimes(timing, link.distanceKm) };
+    }),
+    record: priceRecordForDisplay(prices, complex.id, complex.regionCode), selectedArea: state.area, priceMetric: state.priceMetric
+  });
+}
+
+function renderSelectedApartmentDetail() {
+  if (!selectedApartmentDetail || !$("#detailPanel").classList.contains("open")) return;
+  $("#detailContent").innerHTML = selectedApartmentDetailHtml();
+  lucide.createIcons();
 }
 
 function openApartmentDetail(complex, nearestLink = linksByComplex.get(complex.id)?.[0]) {
-  clearRoute();
-  openDetail(apartmentDetailHtml({
-    complex, nearestLink,
-    relatedLinks: (linksByComplex.get(complex.id) || []).slice().sort((a, b) => a.distanceKm - b.distanceKm),
-    record: priceRecordForDisplay(prices, complex.id, complex.regionCode), selectedArea: state.area
-  }));
+  const commutePeek = commutePlanner?.beginMapDetail();
+  if (!commutePeek) clearRoute();
+  selectedApartmentDetail = { complex, nearestLink };
+  openDetail(selectedApartmentDetailHtml());
+}
+
+function setPriceMetric(value) {
+  state.priceMetric = value;
+  syncControls();
+  renderMap();
+  renderSelectedApartmentDetail();
 }
 
 function showRoute({ uidKey, routeName }) {
+  if (commutePlanner?.isPeeking()) return;
   const paths = shuttle.paths.filter(path => uidKey ? path.uidKey === uidKey : path.routeName === routeName);
   if (!paths.length) return showToast("이 노선의 경로 정보가 없습니다.");
   clearRoute();
   const rendered = addRoutePaths({ L, layer: routeLayer, paths: paths.slice(0, uidKey ? 1 : 4) });
   $("#map").dataset.routeVisible = String(rendered > 0);
+  $("#map").dataset.routeKey = `shuttle:${uidKey || routeName}`;
   showToast(`${paths[0].routeName} 경로 표시`);
+}
+
+function clearMapSelection(event) {
+  if (commutePlanner?.handleMapClick(event)) return;
+  clearRoute();
+  closeDetail();
 }
 
 function renderSearchResults(query) {
@@ -169,33 +232,6 @@ function selectSearchResult(type, id) {
   const complex = complexById.get(id);
   map.setView([complex.lat, complex.lng], 15);
   openApartmentDetail(complex);
-}
-
-function locate() {
-  if (!navigator.geolocation) return showToast("이 기기에서는 위치를 사용할 수 없습니다.");
-  navigator.geolocation.getCurrentPosition(position => {
-    locationLayer.clearLayers();
-    const point = [position.coords.latitude, position.coords.longitude];
-    L.circleMarker(point, { radius: 7, color: "white", weight: 3, fillColor: "#2774ae", fillOpacity: 1 }).addTo(locationLayer);
-    map.setView(point, 14);
-  }, () => showToast("위치 권한을 확인해 주세요."), { enableHighAccuracy: true, timeout: 8000 });
-}
-
-function reset() {
-  Object.assign(state, {
-    category: "전체", route: "전체", routeType: "전체", startHour: "", routeQuery: "",
-    area: "전체", distance: 1.5, households: 200, travelTime: null,
-    showStops: true, showApartments: true, priceColors: true
-  });
-  syncControls();
-  renderMap();
-  map.setView(shuttle.company, 10);
-}
-
-function populateFilters() {
-  $("#routeTypeSelect").innerHTML = routeTypeOptions(shuttle.routeTypes).map(type => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("");
-  const hours = [...new Set(shuttle.entries.map(entry => hourOf(entry.turnStartTime || entry.time)).filter(Boolean))].sort();
-  $("#startHourSelect").innerHTML = `<option value="">전체</option>${hours.map(hour => `<option value="${hour}">${hour}시</option>`).join("")}`;
 }
 
 async function initialize() {
@@ -227,10 +263,16 @@ async function initialize() {
   apartmentLayer = L.layerGroup().addTo(map);
   routeLayer = L.layerGroup().addTo(map);
   locationLayer = L.layerGroup().addTo(map);
+  commuteLayer = L.layerGroup().addTo(map);
+  commutePlanner = createCommutePlanner({ L, map, shuttle, routeLayer, commuteLayer, showToast, clearRoute, closeDetail });
   map.on("moveend", renderMap);
-  populateFilters();
+  map.on("click", clearMapSelection);
+  populateFilterOptions(shuttle);
   syncControls();
-  bindEvents({ state, syncControls, renderMap, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail });
+  const locate = () => locateUser({ map, L, layer: locationLayer, showToast });
+  const reset = () => resetApp({ state, syncControls, renderMap, map, company: shuttle.company });
+  bindEvents({ state, syncControls, renderMap, setPriceMetric, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail });
+  commutePlanner.bind();
   renderMap();
   $("#dataFreshness").textContent = `가격 ${prices.generatedAt ? formatDate(prices.generatedAt) : "갱신 대기"} · 셔틀 ${formatDate(shuttle.generatedAt)}`;
   lucide.createIcons();

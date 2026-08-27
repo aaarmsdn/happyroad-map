@@ -3,7 +3,7 @@ import { debounce } from "./ui-utils.js?v=10";
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
-export function bindEvents({ state, syncControls, renderMap, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail }) {
+export function bindEvents({ state, syncControls, renderMap, setPriceMetric, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail }) {
   const mobilePanel = matchMedia("(max-width: 859px)");
   const controlPanel = $("#controlPanel");
   const detailPanel = $("#detailPanel");
@@ -31,8 +31,8 @@ export function bindEvents({ state, syncControls, renderMap, showRoute, renderSe
     syncSearchAccessibility(false);
     if (restoreFocus) $("#searchButton").focus();
   };
-  $$(".segment").forEach(button => button.addEventListener("click", () => {
-    $$(".segment").forEach(item => {
+  $$('[data-tab]').forEach(button => button.addEventListener("click", () => {
+    $$('[data-tab]').forEach(item => {
       const active = item === button;
       item.classList.toggle("active", active);
       item.setAttribute("aria-selected", active);
@@ -46,9 +46,12 @@ export function bindEvents({ state, syncControls, renderMap, showRoute, renderSe
     renderMap();
   }));
   $$("#areaChips .chip").forEach(button => button.addEventListener("click", () => {
-    state.area = button.dataset.area;
+    state.area = button.dataset.area !== "전체" && state.area === button.dataset.area ? "" : button.dataset.area;
     syncControls();
     renderMap();
+  }));
+  $$("#priceMetricControl .segment").forEach(button => button.addEventListener("click", () => {
+    setPriceMetric(button.dataset.priceMetric);
   }));
   $("#routeQuery").addEventListener("input", debounce(event => {
     state.routeQuery = event.target.value;

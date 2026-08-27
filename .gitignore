@@ -3,3 +3,6 @@
 .env
 .env.*
 *service-account*.json
+.wrangler/
+.dev.vars
+.dev.vars.*
