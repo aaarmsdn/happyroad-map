@@ -25,26 +25,15 @@ jobs:
         with:
           node-version: 24
       - name: Run core tests
-        id: core_tests
-        continue-on-error: true
         run: node --test scripts/browser-route-mock.test.mjs scripts/commute-routing.test.mjs scripts/filter-logic.test.mjs scripts/map-cluster.test.mjs scripts/map-view.test.mjs
       - name: Run data tests
-        id: data_tests
-        continue-on-error: true
         run: node --test scripts/price-refresh.test.mjs scripts/region-match.test.mjs scripts/route-view-data.test.mjs scripts/school-data.test.mjs scripts/ui-contract.test.mjs scripts/ui-data.test.mjs
       - name: Run Worker tests
-        id: worker_tests
-        continue-on-error: true
         run: node --test scripts/worker-route-geometry.test.mjs scripts/worker.test.mjs
       - name: Run browser tests
-        id: browser_tests
-        continue-on-error: true
         env:
           CHROME_PATH: /usr/bin/google-chrome
         run: node --test scripts/price-metric.browser.test.mjs
-      - name: Verify regression checks
-        if: always()
-        run: test "${{ steps.core_tests.outcome }}:${{ steps.data_tests.outcome }}:${{ steps.worker_tests.outcome }}:${{ steps.browser_tests.outcome }}" = "success:success:success:success"
       - name: Validate deploy data
         run: npm run check
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
