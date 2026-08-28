@@ -1,4 +1,4 @@
-import { hourOf, routeTypeOptions } from "./filter-logic.js?v=9";
+import { hourOf, routeTypeOptions } from "./filter-logic.js?v=10";
 import { escapeHtml } from "./ui-utils.js?v=10";
 
 const $ = selector => document.querySelector(selector);
@@ -16,8 +16,8 @@ export function locateUser({ map, L, layer, showToast }) {
 export function resetApp({ state, syncControls, renderMap, map, company }) {
   Object.assign(state, {
     category: "전체", route: "전체", routeType: "전체", startHour: "", routeQuery: "",
-    area: "전체", priceMetric: "max", distance: 1.5, households: 200, travelTime: null,
-    showStops: true, showApartments: true, priceColors: true
+    area: "전체", priceMetric: "max", apartmentColor: "price", distance: 1.5, households: 200, travelTime: null,
+    showStops: true, showApartments: true
   });
   syncControls();
   renderMap();

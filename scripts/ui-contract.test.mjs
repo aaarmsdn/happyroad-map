@@ -194,6 +194,13 @@ test("apartment settings expose highest, average, and lowest price modes", async
   assert.match(html, /data-price-metric="min"[^>]*>최저값/);
 });
 
+test("apartment settings expose price, commute, and plain color modes", async () => {
+  const html = await read("public/index.html");
+  assert.match(html, /data-apartment-color="price"[^>]*>평당가/);
+  assert.match(html, /data-apartment-color="commute"[^>]*>왕복시간/);
+  assert.match(html, /data-apartment-color="none"[^>]*>단색/);
+});
+
 test("price summary changes trigger the automatic refresh workflow", async () => {
   const workflow = await read(".github/workflows/refresh-prices.yml");
   assert.match(workflow, /- "scripts\/price-refresh-lib\.mjs"/);

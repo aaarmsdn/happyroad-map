@@ -1,10 +1,10 @@
-import { bindEvents } from "./app-events.js?v=18";
-import { locateUser, populateFilterOptions, resetApp } from "./app-actions.js?v=2";
+import { bindEvents } from "./app-events.js?v=19";
+import { locateUser, populateFilterOptions, resetApp } from "./app-actions.js?v=3";
 import { createCommutePlanner } from "./commute-controller.js?v=41";
-import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=33";
-import { apartmentDoorTimes, apartmentStopTimings, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceColor, priceFor, pricePerPyeongFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=32";
-import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=9";
-import { addApartmentMarkers, addStopMarkers, groupStops } from "./map-view.js?v=41";
+import { apartmentDetailHtml, stopDetailHtml } from "./detail-view.js?v=34";
+import { apartmentColor, apartmentDoorTimes, apartmentRoundTripMinutes, apartmentStopTimings, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceFor, pricePerPyeongFor, priceRecordForDisplay, routeRequestForStop } from "./filter-data.js?v=33";
+import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=10";
+import { addApartmentMarkers, addStopMarkers, groupStops } from "./map-view.js?v=42";
 import { addRoutePaths } from "./route-view.js?v=4";
 import { searchResults, searchResultsHtml } from "./search-view.js?v=10";
 import { escapeHtml, formatDate } from "./ui-utils.js?v=10";
@@ -14,8 +14,8 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const shuttle = window.HAPPYROAD_MAP_DATA;
 const state = {
   category: "전체", route: "전체", routeType: "전체", startHour: "", routeQuery: "",
-  area: "전체", priceMetric: "max", distance: 1.5, households: 200, travelTime: null,
-  showStops: true, showApartments: true, priceColors: true
+  area: "전체", priceMetric: "max", apartmentColor: "price", distance: 1.5, households: 200, travelTime: null,
+  showStops: true, showApartments: true
 };
 function storedFilters() {
   try {
@@ -67,6 +67,11 @@ function syncControls() {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   });
+  $$("#apartmentColorControl .segment").forEach(button => {
+    const active = button.dataset.apartmentColor === state.apartmentColor;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
   $("#routeQuery").value = state.routeQuery;
   $("#routeTypeSelect").value = state.routeType;
   $("#startHourSelect").value = state.startHour;
@@ -76,7 +81,11 @@ function syncControls() {
   $("#travelTimeMax").value = state.travelTime ?? "";
   $("#showStops").checked = state.showStops;
   $("#showApartments").checked = state.showApartments;
-  $("#priceColors").checked = state.priceColors;
+  const colorLabels = { price: "아파트 평당가", commute: "아파트 왕복시간", none: "아파트" };
+  $("#apartmentColorLabel").textContent = colorLabels[state.apartmentColor];
+  $("#apartmentColorScale").hidden = state.apartmentColor === "none";
+  $("#apartmentColorScale").setAttribute("aria-label", state.apartmentColor === "commute"
+    ? "왕복 120분 미만부터 240분 이상" : "평당 2천5백만원 미만부터 8천만원 이상");
 }
 
 function updateRouteOptions() {
@@ -108,7 +117,15 @@ function renderMap() {
     L, map, layer: apartmentLayer, visibleLinks, complexById,
     priceOf: id => priceFor(prices, state, id, complexById.get(id)?.regionCode),
     perPyeongOf: id => pricePerPyeongFor(prices, state, id, complexById.get(id)?.regionCode),
-    colorOf: value => priceColor(state, value),
+    roundTripOf: (() => {
+      const cache = new Map();
+      return id => {
+        if (!cache.has(id)) cache.set(id, apartmentRoundTripMinutes(linksByComplex.get(id), stations, state.distance));
+        return cache.get(id);
+      };
+    })(),
+    colorMode: state.apartmentColor,
+    colorOf: value => state.apartmentColor === "commute" ? apartmentColor(state, null, value) : apartmentColor(state, value, null),
     onSelect: (complex, link) => commutePlanner?.pickMapPoint(complex, complex.name) || openApartmentDetail(complex, link),
     category: state.category,
     occupiedPoints
@@ -193,6 +210,12 @@ function setPriceMetric(value) {
   renderSelectedApartmentDetail();
 }
 
+function setApartmentColor(value) {
+  state.apartmentColor = value;
+  syncControls();
+  renderMap();
+}
+
 function showRoute({ uidKey, routeName }) {
   if (commutePlanner?.isPeeking()) return;
   const paths = shuttle.paths.filter(path => uidKey ? path.uidKey === uidKey : path.routeName === routeName);
@@ -271,7 +294,7 @@ async function initialize() {
   syncControls();
   const locate = () => locateUser({ map, L, layer: locationLayer, showToast });
   const reset = () => resetApp({ state, syncControls, renderMap, map, company: shuttle.company });
-  bindEvents({ state, syncControls, renderMap, setPriceMetric, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail });
+  bindEvents({ state, syncControls, renderMap, setPriceMetric, setApartmentColor, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail });
   commutePlanner.bind();
   renderMap();
   $("#dataFreshness").textContent = `가격 ${prices.generatedAt ? formatDate(prices.generatedAt) : "갱신 대기"} · 셔틀 ${formatDate(shuttle.generatedAt)}`;

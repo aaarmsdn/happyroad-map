@@ -45,8 +45,8 @@
 
     <div class="map-key" aria-label="지도 범례">
       <span class="stop-key"><i data-lucide="bus-front"></i>정류장</span>
-      <span class="apartment-key"><i data-lucide="building-2"></i>아파트 평당가</span>
-      <span class="price-key" aria-label="평당 2천5백만원 미만부터 8천만원 이상"><b>낮음</b><i></i><i></i><i></i><i></i><i></i><b>높음</b></span>
+      <span class="apartment-key"><i data-lucide="building-2"></i><span id="apartmentColorLabel">아파트 평당가</span></span>
+      <span class="price-key" id="apartmentColorScale" aria-label="평당 2천5백만원 미만부터 8천만원 이상"><b>낮음</b><i></i><i></i><i></i><i></i><i></i><b>높음</b></span>
     </div>
 
     <section class="control-panel" id="controlPanel" aria-label="지도 필터">
@@ -139,10 +139,14 @@
           <span><b>아파트 표시</b><small id="apartmentCount">0개</small></span>
           <input id="showApartments" type="checkbox" checked>
         </label>
-        <label class="toggle-row">
-          <span><b>가격 색상</b><small>최근 평당 실거래 기준</small></span>
-          <input id="priceColors" type="checkbox" checked>
-        </label>
+        <div class="filter-section">
+          <span class="section-label">아파트 색상</span>
+          <div class="segmented-control price-metric-control" id="apartmentColorControl" role="group" aria-label="아파트 색상 기준">
+            <button class="segment active" type="button" aria-pressed="true" data-apartment-color="price">평당가</button>
+            <button class="segment" type="button" aria-pressed="false" data-apartment-color="commute">왕복시간</button>
+            <button class="segment" type="button" aria-pressed="false" data-apartment-color="none">단색</button>
+          </div>
+        </div>
       </div>
 
       <div class="panel-footer">
@@ -213,6 +217,6 @@
   <script src="./vendor/lucide.js"></script>
   <script src="./vendor/leaflet.js"></script>
   <script src="./data/shuttle-data.js"></script>
-  <script type="module" src="./app-main.js?v=124"></script>
+  <script type="module" src="./app-main.js?v=125"></script>
 </body>
 </html>

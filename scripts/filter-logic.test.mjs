@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { directionsByStation, matchingApartmentLinks, priceColor, priceFor, pricePerPyeong, pricePerPyeongFor } from "../public/filter-data.js";
+import { apartmentColor, apartmentRoundTripMinutes, directionsByStation, matchingApartmentLinks, priceColor, priceFor, pricePerPyeong, pricePerPyeongFor } from "../public/filter-data.js";
 import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "../public/filter-logic.js";
 
 test("single-digit shuttle hours are normalized", () => {
@@ -67,6 +67,45 @@ test("apartment links retain every accessible commute direction while choosing t
 
   assert.equal(result.get("1").distanceKm, 0.4);
   assert.deepEqual(result.get("1").accessDirections, ["출근", "퇴근"]);
+});
+
+test("apartment round trip independently chooses the fastest normal stop in each direction", () => {
+  const links = [
+    { stationId: "near", distanceKm: 0.4 },
+    { stationId: "far", distanceKm: 0.8 }
+  ];
+  const stations = new Map([
+    ["near", { entries: [
+      { routeCategory: "출근", turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 80 },
+      { routeCategory: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 70 }
+    ] }],
+    ["far", { entries: [
+      { routeCategory: "출근", turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 55 },
+      { routeCategory: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 85 }
+    ] }]
+  ]);
+  assert.equal(apartmentRoundTripMinutes(links, stations, 1.5), 140);
+  assert.equal(apartmentRoundTripMinutes(links, new Map([["near", { entries: stations.get("near").entries.slice(0, 1) }]]), 1.5), null);
+});
+
+test("apartment round trip falls back to the closest standard clock when normal runs are absent", () => {
+  const links = [{ stationId: "fallback", distanceKm: 0.4 }];
+  const stations = new Map([["fallback", { entries: [
+    { direction: "출근", turnName: "특수 출근", companyTime: "08:10", minutesToCompany: 60 },
+    { direction: "퇴근", turnName: "통상 19시퇴근", companyTime: "19:00", minutesFromCompany: 70 }
+  ] }]]);
+  assert.equal(apartmentRoundTripMinutes(links, stations), 140);
+});
+
+test("apartment color supports price, round-trip time, and plain modes", () => {
+  assert.equal(apartmentColor({ apartmentColor: "commute" }, 9000, 119), "#18864b");
+  assert.equal(apartmentColor({ apartmentColor: "commute" }, 9000, 120), "#2774ae");
+  assert.equal(apartmentColor({ apartmentColor: "commute" }, 9000, 150), "#d6a01d");
+  assert.equal(apartmentColor({ apartmentColor: "commute" }, 9000, 180), "#f07835");
+  assert.equal(apartmentColor({ apartmentColor: "commute" }, 9000, 240), "#d83a3a");
+  assert.equal(apartmentColor({ apartmentColor: "commute" }, 9000, null), "#63717a");
+  assert.equal(apartmentColor({ apartmentColor: "price" }, 9000, 60), "#d83a3a");
+  assert.equal(apartmentColor({ apartmentColor: "none" }, 9000, 60), "#f04438");
 });
 
 test("apartment directions follow filtered station entries instead of unrelated route directions", () => {

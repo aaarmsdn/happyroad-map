@@ -1,4 +1,4 @@
-import { hourOf } from "./filter-logic.js?v=9";
+import { hourOf } from "./filter-logic.js?v=10";
 import { normalize } from "./ui-utils.js?v=10";
 
 export function entryMatches(entry, state) {
@@ -81,6 +81,19 @@ export function apartmentDoorTimes(timing, distanceKm) {
     leaveHomeAt: timing.inboundStopAt ? adjustedClock(timing.inboundStopAt, -walking) : null,
     arriveHomeAt: timing.outboundStopAt ? adjustedClock(timing.outboundStopAt, walking) : null
   };
+}
+
+export function apartmentRoundTripMinutes(links, stations, maxDistance = Infinity) {
+  let inbound = Infinity;
+  let outbound = Infinity;
+  for (const link of links || []) {
+    if (Number(link.distanceKm) > maxDistance) continue;
+    const timing = apartmentStopTimings(stations.get(link.stationId)?.entries || []);
+    const walking = Math.max(0, Math.ceil(Number(link.distanceKm) * 12.5));
+    if (Number.isFinite(timing.inboundMinutes)) inbound = Math.min(inbound, timing.inboundMinutes + walking);
+    if (Number.isFinite(timing.outboundMinutes)) outbound = Math.min(outbound, timing.outboundMinutes + walking);
+  }
+  return Number.isFinite(inbound) && Number.isFinite(outbound) ? inbound + outbound : null;
 }
 
 export function stopRepresentativeMinutes(entries) {
@@ -201,5 +214,16 @@ export function priceColor(state, value) {
   if (value < 4000) return "#2774ae";
   if (value < 6000) return "#d6a01d";
   if (value < 8000) return "#f07835";
+  return "#d83a3a";
+}
+
+export function apartmentColor(state, perPyeong, roundTripMinutes) {
+  if (state.apartmentColor === "none") return "#f04438";
+  if (state.apartmentColor !== "commute") return priceColor({ priceColors: true }, perPyeong);
+  if (!Number.isFinite(roundTripMinutes)) return "#63717a";
+  if (roundTripMinutes < 120) return "#18864b";
+  if (roundTripMinutes < 150) return "#2774ae";
+  if (roundTripMinutes < 180) return "#d6a01d";
+  if (roundTripMinutes < 240) return "#f07835";
   return "#d83a3a";
 }

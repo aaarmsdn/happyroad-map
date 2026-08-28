@@ -3,7 +3,7 @@ import { debounce } from "./ui-utils.js?v=10";
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
-export function bindEvents({ state, syncControls, renderMap, setPriceMetric, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail }) {
+export function bindEvents({ state, syncControls, renderMap, setPriceMetric, setApartmentColor, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail }) {
   const mobilePanel = matchMedia("(max-width: 859px)");
   const controlPanel = $("#controlPanel");
   const detailPanel = $("#detailPanel");
@@ -53,6 +53,9 @@ export function bindEvents({ state, syncControls, renderMap, setPriceMetric, sho
   $$("#priceMetricControl .segment").forEach(button => button.addEventListener("click", () => {
     setPriceMetric(button.dataset.priceMetric);
   }));
+  $$("#apartmentColorControl .segment").forEach(button => button.addEventListener("click", () => {
+    setApartmentColor(button.dataset.apartmentColor);
+  }));
   $("#routeQuery").addEventListener("input", debounce(event => {
     state.routeQuery = event.target.value;
     state.route = "전체";
@@ -86,7 +89,7 @@ export function bindEvents({ state, syncControls, renderMap, setPriceMetric, sho
     state.travelTime = Number(event.target.value) || null;
     renderMap();
   });
-  [["#showStops", "showStops"], ["#showApartments", "showApartments"], ["#priceColors", "priceColors"]].forEach(([selector, key]) => $(selector).addEventListener("change", event => {
+  [["#showStops", "showStops"], ["#showApartments", "showApartments"]].forEach(([selector, key]) => $(selector).addEventListener("change", event => {
     state[key] = event.target.checked;
     renderMap();
   }));
