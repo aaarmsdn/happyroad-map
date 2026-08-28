@@ -65,7 +65,8 @@ for (const entry of shuttle.entries) {
   if (!field || !missingMinutes(entry[field])) continue;
   const samples = referenceMinutes.get(`${entry.routeUid}:${entry.stationUid}:${entry.direction}`)?.slice().sort((left, right) => left - right);
   if (!samples?.length) continue;
-  const commuteMinutes = Math.round(samples[Math.floor(samples.length / 2)]);
+  const middle = Math.floor(samples.length / 2);
+  const commuteMinutes = Math.round(samples.length % 2 ? samples[middle] : (samples[middle - 1] + samples[middle]) / 2);
   const company = clockMinutes(entry.companyTime);
   if (company === null) continue;
   const estimatedTime = entry.direction === "출근" ? company - commuteMinutes : company + commuteMinutes;

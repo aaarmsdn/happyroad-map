@@ -1,4 +1,4 @@
-const CACHE = "happyroad-v168";
+const CACHE = "happyroad-v169";
 const SHELL = [
   "./",
   "./index.html",

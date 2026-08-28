@@ -126,7 +126,8 @@ test("estimate generator uses sibling schedules before protected Kakao driving",
   t.after(() => rm(directory, { recursive: true, force: true }));
 
   const entries = [
-    { turnUid: "reference", routeUid: "sibling-route", routeName: "기준", stationUid: "shared", station: "공통", direction: "출근", stopOrder: 1, companyTime: "08:00", time: "07:10", minutesToCompany: 50, lat: 37.5, lng: 127 },
+    { turnUid: "reference-early", routeUid: "sibling-route", routeName: "기준1", stationUid: "shared", station: "공통", direction: "출근", stopOrder: 1, companyTime: "08:00", time: "07:20", minutesToCompany: 40, lat: 37.5, lng: 127 },
+    { turnUid: "reference-late", routeUid: "sibling-route", routeName: "기준2", stationUid: "shared", station: "공통", direction: "출근", stopOrder: 1, companyTime: "08:00", time: "07:00", minutesToCompany: 60, lat: 37.5, lng: 127 },
     { turnUid: "sibling", routeUid: "sibling-route", routeName: "형제", stationUid: "shared", station: "공통", direction: "출근", stopOrder: 1, companyTime: "08:00", time: null, minutesToCompany: null, lat: 37.5, lng: 127 },
     { turnUid: "driving", routeUid: "driving-route", routeName: "주행", stationUid: "company", station: "회사", direction: "퇴근", stopOrder: 1, companyTime: "18:00", time: "18:00", minutesFromCompany: 0, isCompany: true, lat: 37.25, lng: 127.48 },
     { turnUid: "driving", routeUid: "driving-route", routeName: "주행", stationUid: "destination", station: "다음", direction: "퇴근", stopOrder: 2, companyTime: "18:00", time: null, minutesFromCompany: null, lat: 37.3, lng: 127.5 }
@@ -149,8 +150,8 @@ test("estimate generator uses sibling schedules before protected Kakao driving",
   vm.runInNewContext(await readFile(input, "utf8"), context);
   vm.runInNewContext(await readFile(output, "utf8"), context);
   assert.deepEqual({ ...window.HAPPYROAD_SHUTTLE_TIME_ESTIMATES.methods }, { siblingSchedule: 1, kakaoDriving: 1 });
-  assert.equal(window.HAPPYROAD_MAP_DATA.entries[1].minutesToCompany, 50);
-  assert.equal(window.HAPPYROAD_MAP_DATA.entries[3].minutesFromCompany, 15);
+  assert.equal(window.HAPPYROAD_MAP_DATA.entries[2].minutesToCompany, 50);
+  assert.equal(window.HAPPYROAD_MAP_DATA.entries[4].minutesFromCompany, 15);
   assert.equal(requests.length, 1);
   assert.equal(requests[0].token, "test-estimate-token");
   assert.equal(requests[0].body.departureTime.length, 12);
