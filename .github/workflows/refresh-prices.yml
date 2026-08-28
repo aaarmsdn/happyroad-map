@@ -26,7 +26,6 @@ jobs:
         env:
           MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
           MOLIT_MONTHS: "12"
-          MOLIT_MATCH_AUDIT: "1"
         run: |
           if [ -z "$MOLIT_API_KEY" ]; then
             echo "::error::MOLIT_API_KEY repository secret is missing."

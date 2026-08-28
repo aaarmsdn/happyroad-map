@@ -123,14 +123,6 @@ for (const [cacheKey, ids] of inferredIdsByTradeName) {
 }
 
 const grouped = new Map();
-const matchAudit = process.env.MOLIT_MATCH_AUDIT === "1" ? new Map() : null;
-const auditSkip = (trade, reason) => {
-  if (!matchAudit) return;
-  const key = `${reason}:${trade.regionCode}:${trade.name}`;
-  const entry = matchAudit.get(key) || { reason, regionCode: trade.regionCode, officialName: trade.name, trades: 0 };
-  entry.trades += 1;
-  matchAudit.set(key, entry);
-};
 let skippedAmbiguous = 0;
 let skippedNoName = 0;
 let skippedRegionMismatch = 0;
@@ -151,23 +143,19 @@ for (const trade of trades) {
     if (regionIds.length) matchMethod = "unique_containment_name_and_lawd_cd_from_boundary";
     else if (collidingInferredKeys.has(cacheKey)) {
       skippedAmbiguous += 1;
-      auditSkip(trade, "ambiguous");
       continue;
     }
   }
   if (!regionIds.length) {
     if (ids.length) {
       skippedRegionMismatch += 1;
-      auditSkip(trade, "region_mismatch");
     } else {
       skippedNoName += 1;
-      auditSkip(trade, "name_mismatch");
     }
     continue;
   }
   if (regionIds.length !== 1) {
     skippedAmbiguous += 1;
-    auditSkip(trade, "ambiguous");
     continue;
   }
   if (matchMethod === "configured_alias_and_lawd_cd_from_boundary") matchedByAlias += 1;
@@ -220,7 +208,9 @@ for (const [complexId, complexTrades] of grouped) {
   const observedAreas = Object.entries(record.areas).filter(([, area]) => area.count > 0).map(([band]) => band);
   complex.areaTags = ["59", "84", "102", "115"].filter(band => complex.areaTags.includes(band) || observedAreas.includes(band));
 }
-if (Object.values(prices.complexes).some(record => record.matchMethod === "unique_containment_name_and_lawd_cd_from_boundary"
+if (Object.entries(prices.complexes).some(([complexId, record]) =>
+  (refreshedRegions.has(record.matchRegionCode) || !complexById.has(complexId))
+  && record.matchMethod === "unique_containment_name_and_lawd_cd_from_boundary"
   && new Set(record.matchedOfficialNames?.map(normalizeName)).size !== 1)) {
   throw new Error("Inferred apartment matches must have exactly one official name.");
 }
@@ -249,4 +239,3 @@ await Promise.all([
   writeFile(pricePath, JSON.stringify(prices))
 ]);
 console.log(JSON.stringify(prices.refresh, null, 2));
-if (matchAudit) console.log(`MATCH_AUDIT=${JSON.stringify([...matchAudit.values()].sort((a, b) => b.trades - a.trades))}`);

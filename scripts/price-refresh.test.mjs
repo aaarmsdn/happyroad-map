@@ -27,6 +27,10 @@ test("trade summaries include arithmetic averages and per-pyeong extrema", () =>
 
 test("comparable apartment names ignore punctuation variants", () => {
   assert.equal(comparableName("SK,신일"), comparableName("에스케이신일"));
+  assert.equal(comparableName("다산주공(3단지)"), comparableName("다산주공3단지"));
+  assert.equal(comparableName("효자촌(임광)"), comparableName("효자촌임광"));
+  assert.equal(comparableName("이편한세상센트레빌"), comparableName("e편한세상센트레빌"));
+  assert.equal(comparableName("한강자이(고층)"), comparableName("한강자이"));
 });
 
 test("price refresh matches official neighborhood-prefixed apartment names", async () => {

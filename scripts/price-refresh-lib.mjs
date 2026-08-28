@@ -2,7 +2,8 @@ export function normalizeName(value) {
   return String(value || "")
     .normalize("NFKC")
     .toLowerCase()
-    .replace(/\([^)]*\)/g, "")
+    .replace(/\((?:주상복합|고층|중층|저층)\)/g, "")
+    .replace(/이-?편한세상/g, "e편한세상")
     .replace(/아파트|주상복합|apt/g, "")
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
