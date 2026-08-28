@@ -192,7 +192,7 @@ test("a co-located stop remains the primary pointer target", () => {
   assert.ok(options[0].zIndexOffset > options[1].zIndexOffset);
 });
 
-test("a co-located apartment remains above a low-zoom stop summary", () => {
+test("a low-zoom stop summary remains above an apartment cluster", () => {
   const options = [];
   const L = {
     divIcon: value => value,
@@ -208,17 +208,20 @@ test("a co-located apartment remains above a low-zoom stop summary", () => {
     getBounds: () => ({ pad: () => ({ contains: () => true }) }),
     getZoom: () => 13,
     latLngToLayerPoint: ([lat, lng]) => ({ x: lng, y: lat }),
-    layerPointToLatLng: ({ x, y }) => [y, x]
+    layerPointToLatLng: ({ x, y }) => [y, x],
+    setView() {}
   };
   const stop = index => ({ name: `정류장${index}`, lat: 37.5, lng: 127, entries: [{ routeName: "노선", routeCategory: "퇴근" }] });
-  const complex = { id: "1", name: "아파트", lat: 37.5, lng: 127 };
-
+  const complexes = new Map([
+    ["1", { id: "1", name: "아파트1", lat: 37.5, lng: 127 }],
+    ["2", { id: "2", name: "아파트2", lat: 37.5001, lng: 127.0001 }]
+  ]);
   addStopMarkers({ L, map, layer: {}, groupedStops: new Map([["1", stop(1)], ["2", stop(2)]]), onSelect: () => {} });
   addApartmentMarkers({
-    L, map, layer: {}, visibleLinks: new Map([["1", {}]]), complexById: new Map([["1", complex]]),
+    L, map, layer: {}, visibleLinks: new Map([["1", {}], ["2", {}]]), complexById: complexes,
     priceOf: () => 10000, colorOf: () => "#f04438", onSelect: () => {}
   });
-  assert.ok(options[0].zIndexOffset < options[1].zIndexOffset);
+  assert.ok(options[0].zIndexOffset > options[1].zIndexOffset);
 });
 
 test("dense coincident cluster summaries never overlap", () => {

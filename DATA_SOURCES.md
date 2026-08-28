@@ -23,4 +23,4 @@
 - 공공데이터 안내: https://schoolzone.emac.kr/publicData/dataInfo.do
 - 공공데이터 목록: https://schoolzone.emac.kr/publicData/publicDataList.do
 
-학업성취도와 진학률은 현재 재배포 가능한 전국 단위 공식 데이터셋을 연결하지 않았습니다. 앱은 값을 추정하지 않고 학교알리미 미연결 상태와 확인일만 표시합니다.
+학업성취도와 진학률은 재배포 가능한 전국 단위 공식 데이터셋을 연결하지 않았으며 앱에도 표시하지 않습니다.

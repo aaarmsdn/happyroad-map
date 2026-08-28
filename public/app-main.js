@@ -1,10 +1,10 @@
 import { bindEvents } from "./app-events.js?v=21";
 import { locateUser, populateFilterOptions, resetApp } from "./app-actions.js?v=4";
 import { createCommutePlanner } from "./commute-controller.js?v=41";
-import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=41";
+import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=43";
 import { apartmentColor, apartmentCommuteTimes, apartmentDoorTimes, apartmentRoundTripMinutes, apartmentStopTimings, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceFor, pricePerPyeongFor, priceRecordForDisplay, prioritizeCommuteLinks, routeRequestForStop } from "./filter-data.js?v=36";
 import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=12";
-import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=49";
+import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=58";
 import { addRoutePaths } from "./route-view.js?v=4";
 import { createRequestGate } from "./request-gate.js?v=1";
 import { nearestSchools } from "./school-data.js?v=2";
@@ -125,10 +125,10 @@ function renderMap() {
   stopLayer.clearLayers();
   apartmentLayer.clearLayers();
   schoolLayer.clearLayers();
-  const occupiedPoints = state.showStops ? addStopMarkers({
+  if (state.showStops) addStopMarkers({
     L, map, layer: stopLayer, groupedStops: stops,
     onSelect: stop => commutePlanner?.pickMapPoint(stop, stop.name) || openStopDetail(stop)
-  }) : [];
+  });
   if (state.showApartments) addApartmentMarkers({
     L, map, layer: apartmentLayer, visibleLinks, complexById,
     priceOf: id => priceFor(prices, state, id, complexById.get(id)?.regionCode),
@@ -142,9 +142,8 @@ function renderMap() {
     })(),
     colorMode: state.apartmentColor,
     colorOf: value => state.apartmentColor === "commute" ? apartmentColor(state, null, value) : apartmentColor(state, value, null),
-    onSelect: (complex, link) => commutePlanner?.pickMapPoint(complex, complex.name) || openApartmentDetail(complex, link),
-    category: state.category,
-    occupiedPoints
+    onSelect: complex => commutePlanner?.pickMapPoint(complex, complex.name) || openApartmentDetail(complex),
+    category: state.category
   });
   if (state.showSchools && schoolDataStatus === "loaded") addSchoolMarkers({
     L, map, layer: schoolLayer, schools: schoolData.schools,
@@ -201,10 +200,10 @@ function openStopDetail(stop) {
 
 function selectedApartmentDetailHtml() {
   if (!selectedApartmentDetail) return "";
-  const { complex, nearestLink } = selectedApartmentDetail;
+  const { complex } = selectedApartmentDetail;
   const commute = apartmentCommuteTimes(linksByComplex.get(complex.id), stations, state.distance, state.includeWalking);
   return apartmentDetailHtml({
-    complex, nearestLink,
+    complex,
     relatedLinks: prioritizeCommuteLinks(linksByComplex.get(complex.id), commute).map(link => {
       const stop = stations.get(link.stationId);
       const timing = apartmentStopTimings(stop?.entries || []);
@@ -223,13 +222,13 @@ function renderSelectedApartmentDetail() {
   lucide.createIcons();
 }
 
-async function openApartmentDetail(complex, nearestLink = linksByComplex.get(complex.id)?.[0]) {
+async function openApartmentDetail(complex) {
   const request = apartmentDetailRequests.begin();
   const commutePeek = commutePlanner?.beginMapDetail();
   if (!commutePeek) clearRoute();
   await loadSchoolData();
   if (!apartmentDetailRequests.isCurrent(request)) return;
-  selectedApartmentDetail = { complex, nearestLink };
+  selectedApartmentDetail = { complex };
   openDetail(selectedApartmentDetailHtml());
 }
 

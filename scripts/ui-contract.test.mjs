@@ -7,7 +7,7 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import vm from "node:vm";
 import { commuteJourneyDetailHtml, commuteResultsHtml } from "../public/commute-view.js";
-import { apartmentDetailHtml, stopDetailHtml } from "../public/detail-view.js";
+import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "../public/detail-view.js";
 import { apartmentDoorTimes, apartmentStopTimings, priceRecordForDisplay, stopRepresentativeMinutes } from "../public/filter-data.js";
 import { formatDate, safeExternalUrl } from "../public/ui-utils.js";
 
@@ -125,7 +125,6 @@ test("apartment station timings omit a missing commute direction", () => {
 test("apartment details show inbound, outbound and walking values per stop", () => {
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 100, completed: "2020", externalUrl: "" },
-    nearestLink: null,
     relatedLinks: [{
       station: "성수역", routes: ["노선"], distanceKm: 0.4, inboundMinutes: 62, outboundMinutes: 58,
       inboundStopAt: "06:30", inboundCompanyAt: "08:00", outboundCompanyAt: "18:00", outboundStopAt: "19:20",
@@ -143,7 +142,6 @@ test("apartment details show inbound, outbound and walking values per stop", () 
 test("apartment details show only the available stop direction", () => {
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 100, completed: "2020", externalUrl: "" },
-    nearestLink: null,
     relatedLinks: [{ station: "성수역", routes: ["노선"], distanceKm: 0.4, inboundMinutes: null, outboundMinutes: 58, fallbackLabel: "" }],
     record: null,
     selectedArea: "전체"
@@ -219,7 +217,7 @@ test("apartment details show three nearest schools for every level", () => {
   const school = (name, level, distanceKm) => ({ name, level, distanceKm });
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 100, completed: "2020", externalUrl: "" },
-    nearestLink: null, relatedLinks: [], record: null, selectedArea: "전체",
+    relatedLinks: [], record: null, selectedArea: "전체",
     schoolSource: { name: "한국교육시설안전원 초중고 학교 위치", dataDate: "2026-03-20", metrics: { name: "학교알리미", checkedAt: "2026-08-28" } }, schools: {
       elementary: [school("초1", "elementary", 0.2), school("초2", "elementary", 0.4), school("초3", "elementary", 0.6)],
       middle: [school("중1", "middle", 0.3), school("중2", "middle", 0.5), school("중3", "middle", 0.7)],
@@ -228,14 +226,24 @@ test("apartment details show three nearest schools for every level", () => {
   });
   assert.match(html, /가까운 학교/);
   assert.match(html, /초등학교[\s\S]*초1[\s\S]*초2[\s\S]*초3/);
-  assert.match(html, /중학교[\s\S]*중1[\s\S]*학교알리미 학업지표 미연결 · 연동 확인일 2026-08-28/);
+  assert.match(html, /중학교[\s\S]*중1[\s\S]*중2[\s\S]*중3/);
+  assert.doesNotMatch(html, /학교알리미|학업지표|진학률|성취도/);
+  assert.match(html, /한국교육시설안전원 초중고 학교 위치 · 기준일 2026-03-20/);
+});
+
+test("school details omit disconnected academic metrics", () => {
+  const html = schoolDetailHtml(
+    { name: "중학교", level: "middle", ownership: "공립", lat: 37.5, lng: 127, address: "서울" },
+    { name: "한국교육시설안전원 초중고 학교 위치", dataDate: "2026-03-20", metrics: { name: "학교알리미", checkedAt: "2026-08-28" } }
+  );
+  assert.doesNotMatch(html, /학교알리미|학업 지표|학업지표|진학률|성취도|미연결/);
+  assert.match(html, /중학교 · 공립[\s\S]*주소[\s\S]*서울/);
   assert.match(html, /한국교육시설안전원 초중고 학교 위치 · 기준일 2026-03-20/);
 });
 
 test("apartment detail uses auditable representative commute totals instead of stale link time", () => {
   const html = apartmentDetailHtml({
     complex: { name: "꽃메마을한라신영프로방스", type: "아파트", households: 388, completed: "2004", externalUrl: "" },
-    nearestLink: { station: "전내교차로", distanceKm: 0.575, travelMinutes: 44 },
     relatedLinks: [
       { station: "훼미리프라자", routes: ["보정선"], distanceKm: 0.1, inboundMinutes: 62 },
       { station: "죽전간이정류장(퇴근)", routes: ["분당경부(토)"], distanceKm: 1.1, outboundMinutes: 39 }
@@ -283,7 +291,7 @@ test("a pinned official snapshot is displayable only in its current district", (
 test("parenthetical apartment type wraps as one readable unit", () => {
   const html = apartmentDetailHtml({
     complex: { name: "이천빌리브어바인시티1단지(주상복합)", type: "아파트", households: 1, completed: "2026", externalUrl: "" },
-    nearestLink: null, relatedLinks: [], record: null, selectedArea: "전체"
+    relatedLinks: [], record: null, selectedArea: "전체"
   });
   assert.match(html, /1단지<wbr>\(주상복합\)/);
 });

@@ -168,7 +168,6 @@ export function groupStops(entries) {
 }
 
 export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
-  const renderedPoints = [];
   const bounds = map.getBounds().pad(0.2);
   const stops = [...groupedStops.values()].filter(stop => bounds.contains([stop.lat, stop.lng]));
   if (map.getZoom() < 14) {
@@ -189,11 +188,10 @@ export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
         const times = cluster.items.map(stop => stopRepresentativeMinutes(stop.entries)).filter(Number.isFinite);
         const average = times.length ? Math.round(times.reduce((sum, value) => sum + value, 0) / times.length) : null;
         const clusterColor = stopTimeColor(average);
-        const marker = L.marker(map.layerPointToLatLng(summaryPoints[summaryIndex++]), { icon: markerIcon(L, `<span class="map-cluster stop-cluster" style="--cluster-size:${size}px;--route-color:${clusterColor};--cluster-ink:${markerInk(clusterColor)}"><i data-lucide="bus-front"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 100 });
+        const marker = L.marker(map.layerPointToLatLng(summaryPoints[summaryIndex++]), { icon: markerIcon(L, `<span class="map-cluster stop-cluster" style="--cluster-size:${size}px;--route-color:${clusterColor}"><i data-lucide="bus-front"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 300 });
         marker.bindTooltip(`정류장 ${cluster.items.length.toLocaleString("ko-KR")}개${Number.isFinite(average) ? ` · 평균 ${average}분` : ""}`, { direction: "top" });
         marker.on("click", () => map.setView([cluster.lat, cluster.lng], Math.min(14, map.getZoom() + 2)));
         addAccessibleMarker(marker, layer, `정류장 ${cluster.items.length.toLocaleString("ko-KR")}개`);
-        renderedPoints.push(map.latLngToLayerPoint(marker.getLatLng()));
         continue;
       }
       const stop = cluster.items[0];
@@ -201,21 +199,18 @@ export function addStopMarkers({ L, map, layer, groupedStops, onSelect }) {
       marker.bindTooltip(escapeHtml(stop.name), { direction: "top" });
       marker.on("click", () => onSelect(stop));
       addAccessibleMarker(marker, layer, stop.name);
-      renderedPoints.push(map.latLngToLayerPoint(marker.getLatLng()));
     }
-    return renderedPoints;
+    return;
   }
   stops.forEach(stop => {
     const marker = L.marker([stop.lat, stop.lng], { icon: stopIcon(L, stop), zIndexOffset: 300 });
     marker.bindTooltip(`${escapeHtml(stop.name)} · ${new Set(stop.entries.map(entry => entry.routeName)).size}개 노선`, { direction: "top" });
     marker.on("click", () => onSelect(stop));
     addAccessibleMarker(marker, layer, stop.name);
-    renderedPoints.push(map.latLngToLayerPoint(marker.getLatLng()));
   });
-  return renderedPoints;
 }
 
-export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, priceOf, perPyeongOf = () => null, roundTripOf = () => null, colorMode = "price", colorOf, onSelect, category, occupiedPoints = [] }) {
+export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, priceOf, perPyeongOf = () => null, roundTripOf = () => null, colorMode = "price", colorOf, onSelect, category }) {
   const bounds = map.getBounds().pad(0.2);
   const items = [...visibleLinks]
     .map(([complexId, link]) => ({ complex: complexById.get(complexId), link }))
@@ -253,7 +248,7 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
         : colorMode === "price" && perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : "";
       const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, price, colorOf(metric), apartmentDirectionOpacity(single.link, category)), zIndexOffset: 200 });
       marker.bindTooltip(`${escapeHtml(single.complex.name)}${price ? ` · ${formatPrice(price)}` : ""}${metricLabel}`, { direction: "top" });
-      marker.on("click", () => onSelect(single.complex, single.link));
+      marker.on("click", () => onSelect(single.complex));
       addAccessibleMarker(marker, layer, single.complex.name);
     }
     return;
@@ -269,7 +264,7 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
     const metricLabel = colorMode === "commute" && roundTrip ? ` · 왕복 ${roundTrip}분`
       : colorMode === "price" && perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : "";
     marker.bindTooltip(`${escapeHtml(item.complex.name)}${price ? ` · ${formatPrice(price)}` : ""}${metricLabel}`, { direction: "top" });
-    marker.on("click", () => onSelect(item.complex, item.link));
+    marker.on("click", () => onSelect(item.complex));
     addAccessibleMarker(marker, layer, item.complex.name);
   });
 }

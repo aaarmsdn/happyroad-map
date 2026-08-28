@@ -98,18 +98,11 @@ function schoolSourceHtml(source = {}) {
   return `${escapeHtml(source.name || "학교 위치 공공데이터")}${date} · 직선거리`;
 }
 
-function schoolMetricsSourceHtml(source = {}) {
-  const metrics = source.metrics || {};
-  const date = metrics.checkedAt ? ` · 연동 확인일 ${escapeHtml(metrics.checkedAt)}` : "";
-  return `${escapeHtml(metrics.name || "학교알리미")} 학업지표 미연결${date}`;
-}
-
 function nearbySchoolsHtml(schools = {}, source = {}) {
   const groups = Object.entries(schoolLevelLabels).map(([level, label]) => {
-    const rows = (schools[level] || []).slice(0, 3).map(school => {
-      const metrics = level === "elementary" ? "" : `<small>${schoolMetricsSourceHtml(source)}</small>`;
-      return `<li><span><b>${escapeHtml(school.name)}</b>${metrics}</span><em>${school.distanceKm.toFixed(1)}km</em></li>`;
-    }).join("");
+    const rows = (schools[level] || []).slice(0, 3)
+      .map(school => `<li><span><b>${escapeHtml(school.name)}</b></span><em>${school.distanceKm.toFixed(1)}km</em></li>`)
+      .join("");
     return `<section class="school-group"><h4>${label}</h4>${rows ? `<ol>${rows}</ol>` : `<p>위치 자료 없음</p>`}</section>`;
   }).join("");
   return `<h3 class="detail-subtitle">가까운 학교</h3><p class="source-note">${schoolSourceHtml(source)} · 학교급별 가까운 3곳</p><div class="school-groups">${groups}</div>`;
@@ -119,16 +112,11 @@ export function schoolDetailHtml(school, source = {}) {
   return `
     <h2>${escapeHtml(school.name)}</h2>
     <p class="detail-meta">${schoolLevelLabels[school.level] || "학교"} · ${escapeHtml(school.ownership || "설립형태 미상")}</p>
-    <div class="metric-grid">
-      <div class="metric"><span>거리 자료</span><b>${Number.isFinite(school.lat) && Number.isFinite(school.lng) ? "확인" : "없음"}</b></div>
-      <div class="metric"><span>학업 지표</span><b>미연결</b></div>
-    </div>
-    <p class="empty-note">${schoolMetricsSourceHtml(source)} · 학교알리미에서 개별 확인 필요</p>
     <p class="source-note">${schoolSourceHtml(source)}</p>
     <h3 class="detail-subtitle">주소</h3><p class="detail-meta">${escapeHtml(school.address || "주소 자료 없음")}</p>`;
 }
 
-export function apartmentDetailHtml({ complex, nearestLink, relatedLinks, commute, includeWalking = true, record, selectedArea, priceMetric: selectedMetric = "max", schools = {}, schoolSource = {} }) {
+export function apartmentDetailHtml({ complex, relatedLinks, commute, includeWalking = true, record, selectedArea, priceMetric: selectedMetric = "max", schools = {}, schoolSource = {} }) {
   const metric = priceMetric(selectedMetric);
   const roundTrip = Number.isFinite(commute?.roundTripMinutes) ? `${commute.roundTripMinutes}분` : "-";
   return `

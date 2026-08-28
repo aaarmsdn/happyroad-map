@@ -12,6 +12,7 @@
   --accent: #b42318;
   --accent-warm: #9f430d;
   --success: #18864b;
+  --stop-cluster-bg: #171a1c;
   --school-elementary: #18864b;
   --school-middle: #2774ae;
   --school-high: #7d3f67;
@@ -322,7 +323,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .map-cluster { display: grid; grid-template-rows: 1fr auto; place-items: center; width: var(--cluster-size); height: var(--cluster-size); padding: 3px; border: 2px solid white; color: var(--cluster-ink, white); box-shadow: 0 2px 8px rgba(20,33,61,.28); font-size: 10px; font-weight: 800; line-height: 1; }
 .map-cluster svg { width: 12px; height: 12px; }
 .map-cluster b { font-size: 10px; }
-.stop-cluster { border-radius: 7px; background: var(--route-color, #7d4cc2); }
+.stop-cluster { border-width: 3px; border-color: var(--route-color); border-radius: 7px; color: var(--surface); background: var(--stop-cluster-bg); }
 .direction-badge { display: inline-block; margin-left: 4px; padding: 2px 5px; border-radius: 4px; background: #e8eef6; color: #25415f; font-size: 10px; font-style: normal; line-height: 1.2; }
 .apartment-cluster { border-radius: 50%; background: var(--marker-color, var(--accent)); }
 .apartment-price-marker { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 3px; width: 66px; height: 30px; padding: 0 7px; border: 2px solid var(--marker-color, var(--accent)); border-radius: 6px; color: var(--ink); background: white; box-shadow: 0 2px 8px rgba(20,33,61,.3); font-size: 12px; white-space: nowrap; }

@@ -17,7 +17,6 @@ test("apartment numeric metadata cannot inject executable HTML", () => {
   const payload = '<img src=x onerror="alert(1)">';
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: payload, completed: "2026", externalUrl: "" },
-    nearestLink: { station: "정류장", distanceKm: 0.2, travelMinutes: payload },
     relatedLinks: [{ station: "정류장", routes: ["노선"], distanceKm: 0.2, travelMinutes: payload }],
     commute: { inbound: { totalMinutes: payload, shuttleMinutes: payload, walkingMinutes: payload }, roundTripMinutes: payload },
     record: null,
@@ -31,7 +30,6 @@ test("apartment area keys cannot inject executable HTML", () => {
   const payload = '<img src=x onerror="alert(1)">';
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 100, completed: "2026", externalUrl: "" },
-    nearestLink: null,
     relatedLinks: [],
     record: {
       matchStatus: "matched", latestTradeDate: "20260826", matchedTradeCount: 1,
@@ -46,7 +44,6 @@ test("apartment area keys cannot inject executable HTML", () => {
 test("apartment details show overall per-pyeong prices when target areas have no trades", () => {
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 325, completed: "2004", externalUrl: "" },
-    nearestLink: null,
     relatedLinks: [],
     record: {
       matchStatus: "matched", latestTradeDate: "20260718", averagePerPyeong: 3283, matchedTradeCount: 24,
@@ -63,7 +60,6 @@ test("apartment details show overall per-pyeong prices when target areas have no
 test("legacy details mark unavailable arithmetic averages as pending", () => {
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 325, completed: "2004", externalUrl: "" },
-    nearestLink: null,
     relatedLinks: [],
     record: {
       matchStatus: "matched", latestTradeDate: "20260718", matchedTradeCount: 3,
@@ -79,7 +75,6 @@ test("legacy details mark unavailable arithmetic averages as pending", () => {
 test("legacy details distinguish nonstandard trades awaiting summaries", () => {
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 325, completed: "2004", externalUrl: "" },
-    nearestLink: null,
     relatedLinks: [],
     record: {
       matchStatus: "matched", latestTradeDate: "20260718", matchedTradeCount: 19, medianPerPyeong: 6132,
@@ -96,7 +91,6 @@ test("legacy details distinguish nonstandard trades awaiting summaries", () => {
 test("apartment details use the selected transaction price metric", () => {
   const common = {
     complex: { name: "단지", type: "아파트", households: 325, completed: "2004", externalUrl: "" },
-    nearestLink: null,
     relatedLinks: [],
     record: {
       matchStatus: "matched", latestTradeDate: "20260718", matchedTradeCount: 3,
