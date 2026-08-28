@@ -123,6 +123,14 @@ for (const [cacheKey, ids] of inferredIdsByTradeName) {
 }
 
 const grouped = new Map();
+const matchAudit = process.env.MOLIT_MATCH_AUDIT === "1" ? new Map() : null;
+const auditSkip = (trade, reason) => {
+  if (!matchAudit) return;
+  const key = `${reason}:${trade.regionCode}:${trade.name}`;
+  const entry = matchAudit.get(key) || { reason, regionCode: trade.regionCode, officialName: trade.name, trades: 0 };
+  entry.trades += 1;
+  matchAudit.set(key, entry);
+};
 let skippedAmbiguous = 0;
 let skippedNoName = 0;
 let skippedRegionMismatch = 0;
@@ -143,16 +151,23 @@ for (const trade of trades) {
     if (regionIds.length) matchMethod = "unique_containment_name_and_lawd_cd_from_boundary";
     else if (collidingInferredKeys.has(cacheKey)) {
       skippedAmbiguous += 1;
+      auditSkip(trade, "ambiguous");
       continue;
     }
   }
   if (!regionIds.length) {
-    if (ids.length) skippedRegionMismatch += 1;
-    else skippedNoName += 1;
+    if (ids.length) {
+      skippedRegionMismatch += 1;
+      auditSkip(trade, "region_mismatch");
+    } else {
+      skippedNoName += 1;
+      auditSkip(trade, "name_mismatch");
+    }
     continue;
   }
   if (regionIds.length !== 1) {
     skippedAmbiguous += 1;
+    auditSkip(trade, "ambiguous");
     continue;
   }
   if (matchMethod === "configured_alias_and_lawd_cd_from_boundary") matchedByAlias += 1;
@@ -234,3 +249,4 @@ await Promise.all([
   writeFile(pricePath, JSON.stringify(prices))
 ]);
 console.log(JSON.stringify(prices.refresh, null, 2));
+if (matchAudit) console.log(`MATCH_AUDIT=${JSON.stringify([...matchAudit.values()].sort((a, b) => b.trades - a.trades))}`);

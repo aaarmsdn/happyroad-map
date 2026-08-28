@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { summarize } from "./price-refresh-lib.mjs";
+import { comparableName, summarize } from "./price-refresh-lib.mjs";
 
 test("trade summaries include arithmetic averages and per-pyeong extrema", () => {
   assert.deepEqual(summarize([
@@ -23,6 +23,10 @@ test("trade summaries include arithmetic averages and per-pyeong extrema", () =>
     medianPerPyeong: 472,
     maxPerPyeong: 630
   });
+});
+
+test("comparable apartment names ignore punctuation variants", () => {
+  assert.equal(comparableName("SK,신일"), comparableName("에스케이신일"));
 });
 
 test("price refresh matches official neighborhood-prefixed apartment names", async () => {

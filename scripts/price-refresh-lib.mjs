@@ -3,7 +3,8 @@ export function normalizeName(value) {
     .normalize("NFKC")
     .toLowerCase()
     .replace(/\([^)]*\)/g, "")
-    .replace(/아파트|주상복합|apt|\s|[-_.·]/g, "");
+    .replace(/아파트|주상복합|apt/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 export function comparableName(value) {
