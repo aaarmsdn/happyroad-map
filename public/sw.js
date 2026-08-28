@@ -1,4 +1,4 @@
-const CACHE = "happyroad-v169";
+const CACHE = "happyroad-v170";
 const SHELL = [
   "./",
   "./index.html",
@@ -10,6 +10,7 @@ const SHELL = [
   "./commute-view.js?v=8",
   "./detail-view.js?v=44",
   "./filter-data.js?v=37",
+  "./price-data.js?v=1",
   "./filter-logic.js?v=12",
   "./map-view.js?v=60",
   "./school-data.js?v=2",

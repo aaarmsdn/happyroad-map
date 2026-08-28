@@ -82,6 +82,7 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
     });
     await t.test("apartment stop details return to the parent apartment", async () => {
     for (let zoom = 0; zoom < 2; zoom += 1) {
+      const markerState = await evaluate("[...document.querySelectorAll('.apartment-cluster,.apartment-price-marker')].map(item => item.textContent).join('|')");
       await waitFor(() => evaluate(`(() => {
         const marker = [...document.querySelectorAll('.apartment-cluster')]
           .map(item => item.closest('.leaflet-marker-icon')).find(item => item?.getBoundingClientRect().width > 0);
@@ -89,7 +90,7 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
         marker.click();
         return true;
       })()`));
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await waitFor(() => evaluate("[...document.querySelectorAll('.apartment-cluster,.apartment-price-marker')].map(item => item.textContent).join('|') !== " + JSON.stringify(markerState)));
     }
     const apartmentName = await waitFor(() => evaluate(`(() => {
       const marker = [...document.querySelectorAll('.apartment-price-marker')]
@@ -110,8 +111,7 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
     await waitFor(() => evaluate("document.querySelector('#detailContent h2').textContent === " + JSON.stringify(apartmentName)));
     assert.equal(await evaluate("document.querySelector('#detailPanel').classList.contains('open')"), true);
     await evaluate("document.querySelector('#detailCloseButton').click(); true");
-    await new Promise(resolve => setTimeout(resolve, 100));
-    assert.equal(await evaluate("document.activeElement !== document.body && document.activeElement.id !== 'detailCloseButton'"), true);
+    await waitFor(() => evaluate("document.activeElement !== document.body && document.activeElement.id !== 'detailCloseButton'"));
     });
     await t.test("map picking uses marker names and reverse-geocoded blank-map addresses", async () => {
     await evaluate(`(() => {
