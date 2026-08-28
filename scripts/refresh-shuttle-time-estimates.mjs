@@ -4,8 +4,8 @@ import vm from "node:vm";
 const apiBase = process.env.ROUTING_API_BASE || "https://happyroad-routing.aaarmsdn-happyroad.workers.dev";
 const origin = process.env.ROUTING_ORIGIN || "https://aaarmsdn.github.io";
 const estimateToken = process.env.SHUTTLE_ESTIMATE_TOKEN;
-const inputUrl = new URL("../public/data/shuttle-data.js", import.meta.url);
-const outputUrl = new URL("../public/data/shuttle-time-estimates.js", import.meta.url);
+const inputUrl = new URL(process.env.SHUTTLE_DATA_URL || "../public/data/shuttle-data.js", import.meta.url);
+const outputUrl = new URL(process.env.SHUTTLE_ESTIMATE_OUTPUT_URL || "../public/data/shuttle-time-estimates.js", import.meta.url);
 
 const context = { window: {} };
 vm.runInNewContext(await readFile(inputUrl, "utf8"), context);
