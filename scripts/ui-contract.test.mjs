@@ -150,6 +150,16 @@ test("apartment details show only the available stop direction", () => {
   assert.doesNotMatch(html, /출퇴근|출근 -|퇴근 -|노선 없음/);
 });
 
+test("apartment stop rows carry a station id for nested detail navigation", () => {
+  const html = apartmentDetailHtml({
+    complex: { name: "단지", type: "아파트", households: 100, completed: "2020", externalUrl: "" },
+    relatedLinks: [{ stationId: "station-1", station: "성수역", routes: ["노선"], distanceKm: 0.4, inboundMinutes: 62, outboundMinutes: null, fallbackLabel: "" }],
+    record: null,
+    selectedArea: "전체"
+  });
+  assert.match(html, /data-stop-id="station-1"/);
+});
+
 test("commute result UI exposes breakdown and concrete journey detail", () => {
   const journey = {
     accessMode: "public-transit", accessLabel: "대중교통", routeName: "노선", station: "성수역",

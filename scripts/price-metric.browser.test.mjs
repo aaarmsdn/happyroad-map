@@ -80,6 +80,36 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
     assert.equal(await evaluate("document.querySelector('#apartmentCount').textContent"), "0개");
     await evaluate("document.querySelector('[data-area=전체]').click(); true");
     });
+    await t.test("apartment stop details return to the parent apartment", async () => {
+    for (let zoom = 0; zoom < 2; zoom += 1) {
+      await waitFor(() => evaluate(`(() => {
+        const marker = [...document.querySelectorAll('.apartment-cluster')]
+          .map(item => item.closest('.leaflet-marker-icon')).find(item => item?.getBoundingClientRect().width > 0);
+        if (!marker) return false;
+        marker.click();
+        return true;
+      })()`));
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+    const apartmentName = await waitFor(() => evaluate(`(() => {
+      const marker = [...document.querySelectorAll('.apartment-price-marker')]
+        .map(item => item.closest('.leaflet-marker-icon')).find(item => item?.getBoundingClientRect().width > 0);
+      if (!marker) return null;
+      const name = marker.getAttribute('aria-label').split(' · ')[0];
+      marker.click();
+      return name;
+    })()`));
+    await waitFor(() => evaluate("Boolean(document.querySelector('.apartment-stop-item'))"));
+    assert.equal(await evaluate("document.querySelector('#detailContent h2').textContent"), apartmentName);
+    const stopName = await evaluate("document.querySelector('.apartment-stop-item b').childNodes[0].textContent.trim()");
+    await evaluate("document.querySelector('.apartment-stop-item').click(); true");
+    await waitFor(() => evaluate("document.querySelector('#detailContent h2').textContent !== " + JSON.stringify(apartmentName)));
+    assert.equal(await evaluate("document.querySelector('#detailContent h2').textContent"), stopName);
+    await evaluate("document.querySelector('#detailCloseButton').click(); true");
+    await waitFor(() => evaluate("document.querySelector('#detailContent h2').textContent === " + JSON.stringify(apartmentName)));
+    assert.equal(await evaluate("document.querySelector('#detailPanel').classList.contains('open')"), true);
+    await evaluate("document.querySelector('#detailCloseButton').click(); true");
+    });
     await t.test("map picking uses marker names and reverse-geocoded blank-map addresses", async () => {
     await evaluate(`(() => {
       const nativeFetch = window.fetch;

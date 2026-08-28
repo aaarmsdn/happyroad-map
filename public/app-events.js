@@ -3,7 +3,7 @@ import { debounce } from "./ui-utils.js?v=10";
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
-export function bindEvents({ state, syncControls, renderMap, renderSelectedApartmentDetail, setPriceMetric, setApartmentColor, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail }) {
+export function bindEvents({ state, syncControls, renderMap, renderSelectedApartmentDetail, setPriceMetric, setApartmentColor, showRoute, openApartmentStopDetail, renderSearchResults, selectSearchResult, locate, reset, closeDetail }) {
   const mobilePanel = matchMedia("(max-width: 859px)");
   const controlPanel = $("#controlPanel");
   const detailPanel = $("#detailPanel");
@@ -112,10 +112,11 @@ export function bindEvents({ state, syncControls, renderMap, renderSelectedApart
     syncPanelAccessibility();
     $("#panelButton").focus();
   });
-  $("#detailCloseButton").addEventListener("click", closeDetail);
+  $("#detailCloseButton").addEventListener("click", () => closeDetail(true, true));
   $("#detailContent").addEventListener("click", event => {
-    const button = event.target.closest("[data-route-key], [data-route-name]");
-    if (button) showRoute({ uidKey: button.dataset.routeKey, routeName: button.dataset.routeName });
+    const button = event.target.closest("[data-stop-id], [data-route-key], [data-route-name]");
+    if (button?.dataset.stopId) openApartmentStopDetail(button.dataset.stopId);
+    else if (button) showRoute({ uidKey: button.dataset.routeKey, routeName: button.dataset.routeName });
   });
   $("#searchButton").addEventListener("click", () => {
     searchDialog.classList.add("open");
@@ -140,7 +141,7 @@ export function bindEvents({ state, syncControls, renderMap, renderSelectedApart
     const detailWasOpen = $("#detailPanel").classList.contains("open");
     const panelWasOpen = $("#controlPanel").classList.contains("open");
     closeSearch(searchWasOpen);
-    if (detailWasOpen) closeDetail();
+    if (detailWasOpen) closeDetail(true, true);
     $("#controlPanel").classList.remove("open");
     syncPanelAccessibility();
     if (!searchWasOpen && panelWasOpen) $("#panelButton").focus();

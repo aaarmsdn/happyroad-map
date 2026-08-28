@@ -1,15 +1,15 @@
-const CACHE = "happyroad-v163";
+const CACHE = "happyroad-v164";
 const SHELL = [
   "./",
   "./index.html",
   "./styles.css?v=43",
-  "./app-main.js?v=145",
-  "./app-events.js?v=21",
+  "./app-main.js?v=146",
+  "./app-events.js?v=22",
   "./app-actions.js?v=4",
   "./commute-controller.js?v=41",
   "./commute-view.js?v=8",
-  "./detail-view.js?v=43",
-  "./filter-data.js?v=36",
+  "./detail-view.js?v=44",
+  "./filter-data.js?v=37",
   "./filter-logic.js?v=12",
   "./map-view.js?v=58",
   "./school-data.js?v=2",
@@ -24,7 +24,8 @@ const SHELL = [
   "./vendor/leaflet.css",
   "./vendor/leaflet.js",
   "./vendor/lucide.js",
-  "./data/shuttle-data.js"
+  "./data/shuttle-data.js",
+  "./data/shuttle-time-estimates.js"
 ];
 
 self.addEventListener("install", event => {

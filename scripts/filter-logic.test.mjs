@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { apartmentColor, apartmentRoundTripMinutes, directionsByStation, matchingApartmentLinks, priceColor, priceFor, pricePerPyeong, pricePerPyeongFor } from "../public/filter-data.js";
+import { apartmentColor, apartmentCommuteTimes, apartmentLinkTimings, apartmentRoundTripMinutes, directionsByStation, matchingApartmentLinks, priceColor, priceFor, pricePerPyeong, pricePerPyeongFor } from "../public/filter-data.js";
 import { hourOf, restoreFilters, routeTypeOptions, selectGlobalRoute } from "../public/filter-logic.js";
 
 test("single-digit shuttle hours are normalized", () => {
@@ -126,6 +126,37 @@ test("apartment commute totals expose shuttle and optional walking time per dire
     inbound: { shuttleMinutes: 55, walkingMinutes: 0, totalMinutes: 55, stationId: "in" },
     outbound: { shuttleMinutes: 39, walkingMinutes: 0, totalMinutes: 39, stationId: "out" },
     roundTripMinutes: 94
+  });
+});
+
+test("apartment commute ignores opposite-direction routes sharing a station id", () => {
+  const links = [
+    { stationId: "inbound-side", distanceKm: 0.2, routes: ["출근선"], directions: ["출근"] },
+    { stationId: "outbound-side", distanceKm: 0.3, routes: ["퇴근선"], directions: ["퇴근"] },
+    { stationId: "late-outbound", distanceKm: 0.1, routes: ["심야퇴근선"], directions: ["퇴근"] }
+  ];
+  const stations = new Map([
+    ["inbound-side", { entries: [
+      { routeName: "출근선", direction: "출근", turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 55 },
+      { routeName: "심야퇴근선", direction: "퇴근", turnName: "통상 22시퇴근", companyTime: "22:00", minutesFromCompany: 40 }
+    ] }],
+    ["outbound-side", { entries: [
+      { routeName: "퇴근선", direction: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 70 }
+    ] }],
+    ["late-outbound", { entries: [
+      { routeName: "심야퇴근선", direction: "퇴근", turnName: "통상 22시퇴근", companyTime: "22:00", minutesFromCompany: 40 }
+    ] }]
+  ]);
+
+  assert.deepEqual(apartmentLinkTimings(links[0], stations), {
+    inboundMinutes: 55, outboundMinutes: null,
+    inboundStopAt: "07:05", inboundCompanyAt: "08:00", outboundCompanyAt: null, outboundStopAt: null,
+    fallbackLabel: ""
+  });
+  assert.deepEqual(apartmentCommuteTimes(links, stations, 1.5, false), {
+    inbound: { shuttleMinutes: 55, walkingMinutes: 0, totalMinutes: 55, stationId: "inbound-side" },
+    outbound: { shuttleMinutes: 70, walkingMinutes: 0, totalMinutes: 70, stationId: "outbound-side" },
+    roundTripMinutes: 125
   });
 });
 

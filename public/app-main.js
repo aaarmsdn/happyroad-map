@@ -1,8 +1,8 @@
-import { bindEvents } from "./app-events.js?v=21";
+import { bindEvents } from "./app-events.js?v=22";
 import { locateUser, populateFilterOptions, resetApp } from "./app-actions.js?v=4";
 import { createCommutePlanner } from "./commute-controller.js?v=41";
-import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=43";
-import { apartmentColor, apartmentCommuteTimes, apartmentDoorTimes, apartmentRoundTripMinutes, apartmentStopTimings, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceFor, pricePerPyeongFor, priceRecordForDisplay, prioritizeCommuteLinks, routeRequestForStop } from "./filter-data.js?v=36";
+import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=44";
+import { apartmentColor, apartmentCommuteTimes, apartmentDoorTimes, apartmentLinkTimings, apartmentRoundTripMinutes, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceFor, pricePerPyeongFor, priceRecordForDisplay, prioritizeCommuteLinks, routeRequestForStop } from "./filter-data.js?v=37";
 import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=12";
 import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=58";
 import { addRoutePaths } from "./route-view.js?v=4";
@@ -43,6 +43,7 @@ let toastTimer;
 let storageWarningShown = false;
 let detailReturnFocus;
 let selectedApartmentDetail;
+let apartmentStopDetailOpen = false;
 const apartmentDetailRequests = createRequestGate();
 let commutePlanner;
 let schoolData = { source: {}, schools: [] };
@@ -162,8 +163,8 @@ function renderMap() {
   lucide.createIcons();
 }
 
-function openDetail(html) {
-  detailReturnFocus = document.activeElement;
+function openDetail(html, preserveReturnFocus = false) {
+  if (!preserveReturnFocus) detailReturnFocus = document.activeElement;
   $("#detailContent").innerHTML = html;
   const panel = $("#detailPanel");
   panel.classList.add("open");
@@ -175,23 +176,31 @@ function openDetail(html) {
   $("#detailCloseButton").focus({ preventScroll: true });
 }
 
-function closeDetail(restoreCommute = true) {
+function closeDetail(restoreCommute = true, restoreApartment = false) {
   apartmentDetailRequests.cancel();
+  if (restoreApartment && apartmentStopDetailOpen && selectedApartmentDetail) {
+    apartmentStopDetailOpen = false;
+    clearRoute();
+    openDetail(selectedApartmentDetailHtml(), true);
+    return;
+  }
   const panel = $("#detailPanel");
   panel.classList.remove("open");
   panel.inert = true;
   panel.setAttribute("aria-hidden", "true");
   if (detailReturnFocus?.isConnected) detailReturnFocus.focus();
   detailReturnFocus = null;
+  apartmentStopDetailOpen = false;
   selectedApartmentDetail = null;
   if (restoreCommute) commutePlanner?.restoreMapDetail();
 }
 
-function openStopDetail(stop) {
+function openStopDetail(stop, returnToApartment = false) {
   apartmentDetailRequests.cancel();
   const commutePeek = commutePlanner?.beginMapDetail();
-  selectedApartmentDetail = null;
-  openDetail(stopDetailHtml(stop));
+  apartmentStopDetailOpen = returnToApartment && Boolean(selectedApartmentDetail);
+  if (!apartmentStopDetailOpen) selectedApartmentDetail = null;
+  openDetail(stopDetailHtml(stop), apartmentStopDetailOpen);
   if (!commutePeek) {
     const route = routeRequestForStop(stop, shuttle.paths, state);
     if (route) showRoute(route);
@@ -205,8 +214,7 @@ function selectedApartmentDetailHtml() {
   return apartmentDetailHtml({
     complex,
     relatedLinks: prioritizeCommuteLinks(linksByComplex.get(complex.id), commute).map(link => {
-      const stop = stations.get(link.stationId);
-      const timing = apartmentStopTimings(stop?.entries || []);
+      const timing = apartmentLinkTimings(link, stations);
       return { ...link, ...timing, ...apartmentDoorTimes(timing, link.distanceKm) };
     }),
     commute,
@@ -228,6 +236,7 @@ async function openApartmentDetail(complex) {
   if (!commutePeek) clearRoute();
   await loadSchoolData();
   if (!apartmentDetailRequests.isCurrent(request)) return;
+  apartmentStopDetailOpen = false;
   selectedApartmentDetail = { complex };
   openDetail(selectedApartmentDetailHtml());
 }
@@ -237,6 +246,11 @@ function setPriceMetric(value) {
   syncControls();
   renderMap();
   renderSelectedApartmentDetail();
+}
+
+function openApartmentStopDetail(stationId) {
+  const stop = stations.get(stationId);
+  if (stop) openStopDetail(stop, true);
 }
 
 function schoolCountLabel() {
@@ -272,6 +286,7 @@ function openSchoolDetail(school) {
   apartmentDetailRequests.cancel();
   const commutePeek = commutePlanner?.beginMapDetail();
   if (!commutePeek) clearRoute();
+  apartmentStopDetailOpen = false;
   selectedApartmentDetail = null;
   openDetail(schoolDetailHtml(school, schoolData.source));
 }
@@ -361,7 +376,7 @@ async function initialize() {
   syncControls();
   const locate = () => locateUser({ map, L, layer: locationLayer, showToast });
   const reset = () => resetApp({ state, syncControls, renderMap, map, company: shuttle.company });
-  bindEvents({ state, syncControls, renderMap, renderSelectedApartmentDetail, setPriceMetric, setApartmentColor, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail });
+  bindEvents({ state, syncControls, renderMap, renderSelectedApartmentDetail, setPriceMetric, setApartmentColor, showRoute, openApartmentStopDetail, renderSearchResults, selectSearchResult, locate, reset, closeDetail });
   commutePlanner.bind();
   renderMap();
   $("#dataFreshness").textContent = `가격 ${prices.generatedAt ? formatDate(prices.generatedAt) : "갱신 대기"} · 셔틀 ${formatDate(shuttle.generatedAt)}`;

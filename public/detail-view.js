@@ -1,5 +1,5 @@
 import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
-import { priceMetric, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=36";
+import { priceMetric, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=37";
 
 export function stopDetailHtml(stop) {
   const variants = [...new Map(stop.entries.map(entry => [entry.uidKey, entry])).values()]
@@ -45,6 +45,7 @@ function stopTiming(entry) {
   const parts = [];
   if (Number.isFinite(minutes) && minutes >= 0) parts.push(`${Math.round(minutes)}분`);
   if (clockTime(arrival) !== "-") parts.push(`${inbound ? "회사" : "정류장"} ${clockTime(arrival)} 도착`);
+  if (entry.timeEstimated) parts.push("추정");
   return { departure: clockTime(departure), detail: parts.join(" · ") };
 }
 
@@ -82,7 +83,7 @@ function areaMetrics(record, selectedArea, selectedMetric) {
 }
 
 function commuteMetric(label, value, includeWalking) {
-  if (!value || !Number.isFinite(value.totalMinutes)) return `<div class="metric"><span>${label}</span><b>-</b></div>`;
+  if (!value || !Number.isFinite(value.totalMinutes)) return `<div class="metric"><span>${label}</span><b>운행 없음</b></div>`;
   const shuttleMinutes = Number.isFinite(value.shuttleMinutes) ? value.shuttleMinutes : "-";
   const walkingMinutes = Number.isFinite(value.walkingMinutes) ? value.walkingMinutes : "-";
   const breakdown = includeWalking
@@ -140,7 +141,7 @@ export function apartmentDetailHtml({ complex, relatedLinks, commute, includeWal
           ? `<small class="apartment-door-time">집 ${escapeHtml(link.leaveHomeAt)} 출발 · 셔틀 ${escapeHtml(link.inboundStopAt)} · 회사 ${escapeHtml(link.inboundCompanyAt)}</small>` : "";
         const outboundDoor = link.outboundCompanyAt && link.outboundStopAt && link.arriveHomeAt
           ? `<small class="apartment-door-time">회사 ${escapeHtml(link.outboundCompanyAt)} · 정류장 ${escapeHtml(link.outboundStopAt)} · 집 ${escapeHtml(link.arriveHomeAt)} 도착</small>` : "";
-        return `<button class="route-item apartment-stop-item" type="button" data-route-name="${escapeHtml(link.routes[0] || "")}"><span><b>${escapeHtml(link.station)}${direction ? ` <em class="direction-badge">${direction}</em>` : ""}</b><small>${escapeHtml(link.routes.slice(0, 2).join(" · ") || "연결 노선")}</small><small class="apartment-stop-times">${times}</small>${inboundDoor}${outboundDoor}${link.fallbackLabel ? `<small class="timing-basis">${escapeHtml(link.fallbackLabel)}</small>` : ""}</span><i data-lucide="chevron-right" aria-hidden="true"></i></button>`;
+        return `<button class="route-item apartment-stop-item" type="button" data-stop-id="${escapeHtml(link.stationId)}"><span><b>${escapeHtml(link.station)}${direction ? ` <em class="direction-badge">${direction}</em>` : ""}</b><small>${escapeHtml(link.routes.slice(0, 2).join(" · ") || "연결 노선")}</small><small class="apartment-stop-times">${times}</small>${inboundDoor}${outboundDoor}${link.fallbackLabel ? `<small class="timing-basis">${escapeHtml(link.fallbackLabel)}</small>` : ""}</span><i data-lucide="chevron-right" aria-hidden="true"></i></button>`;
       }).join("")}
     </div>
     ${nearbySchoolsHtml(schools, schoolSource)}

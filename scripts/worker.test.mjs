@@ -3,7 +3,13 @@ import test from "node:test";
 import worker, { handleRequest } from "../worker/src/index.js";
 import { routeResult } from "../worker/src/normalize.js";
 
-const env = { KAKAO_REST_API_KEY: "secret", ALLOWED_ORIGIN: "https://aaarmsdn.github.io", ROUTE_RATE_LIMITER: { limit: async () => ({ success: true }) } };
+const env = { KAKAO_REST_API_KEY: "secret", SHUTTLE_ESTIMATE_TOKEN: "estimate-secret", ALLOWED_ORIGIN: "https://aaarmsdn.github.io", ROUTE_RATE_LIMITER: { limit: async () => ({ success: true }) } };
+
+function futureDepartureStamp(hours = 36) {
+  const kst = new Date(Date.now() + hours * 60 * 60 * 1000 + 9 * 60 * 60 * 1000);
+  return [kst.getUTCFullYear(), kst.getUTCMonth() + 1, kst.getUTCDate(), kst.getUTCHours(), kst.getUTCMinutes()]
+    .map((value, index) => String(value).padStart(index ? 2 : 4, "0")).join("");
+}
 
 test("route fares use only the field for the requested transport mode", () => {
   const start = { lat: 37.5, lng: 127 };
@@ -504,4 +510,47 @@ test("worker requests Kakao Mobility directions for a car route", async () => {
     points: [[37.5, 127], [37.45, 127.05], [37.4, 127.1]],
     steps: [{ type: "car", guidance: "테헤란로 진입", minutes: 13, distanceMeters: 120 }]
   });
+});
+
+test("worker requests future car directions at a supplied shuttle departure time", async () => {
+  let upstream;
+  const departureTime = futureDepartureStamp();
+  const response = await handleRequest(new Request("https://worker.test/route", {
+    method: "POST", headers: { origin: env.ALLOWED_ORIGIN, "content-type": "application/json", "x-happyroad-estimate-token": env.SHUTTLE_ESTIMATE_TOKEN },
+    body: JSON.stringify({
+      start: { lat: 37.5, lng: 127 }, end: { lat: 37.4, lng: 127.1 }, mode: "car", departureTime
+    })
+  }), env, async url => {
+    upstream = String(url);
+    return Response.json({ routes: [{
+      summary: { duration: 600, distance: 4000 },
+      sections: [{ roads: [{ vertexes: [127, 37.5, 127.1, 37.4] }], guides: [] }]
+    }] });
+  });
+  assert.equal(response.status, 200);
+  assert.match(upstream, /^https:\/\/apis-navi\.kakaomobility\.com\/v1\/future\/directions\?/);
+  assert.match(upstream, new RegExp(`departure_time=${departureTime}`));
+});
+
+test("worker protects future car routes with a private token", async () => {
+  const response = await handleRequest(new Request("https://worker.test/route", {
+    method: "POST", headers: { origin: env.ALLOWED_ORIGIN, "content-type": "application/json" },
+    body: JSON.stringify({
+      start: { lat: 37.5, lng: 127 }, end: { lat: 37.4, lng: 127.1 }, mode: "car", departureTime: futureDepartureStamp()
+    })
+  }), env, async () => Response.json({}));
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: "forbidden_future_route" });
+});
+
+test("worker rejects impossible, past, and distant future departure times", async () => {
+  for (const departureTime of ["202602300000", "200001010000", futureDepartureStamp(8 * 24)]) {
+    const response = await handleRequest(new Request("https://worker.test/route", {
+      method: "POST", headers: { origin: env.ALLOWED_ORIGIN, "content-type": "application/json", "x-happyroad-estimate-token": env.SHUTTLE_ESTIMATE_TOKEN },
+      body: JSON.stringify({
+        start: { lat: 37.5, lng: 127 }, end: { lat: 37.4, lng: 127.1 }, mode: "car", departureTime
+      })
+    }), env, async () => Response.json({}));
+    assert.equal(response.status, 400);
+  }
 });

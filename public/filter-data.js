@@ -59,6 +59,7 @@ export function apartmentStopTimings(entries) {
   const fallbacks = [];
   if (selectedInbound && !normalInbound) fallbacks.push(selectedInbound.turnName || selectedInbound.routeName);
   if (selectedOutbound && !normalOutbound) fallbacks.push(selectedOutbound.turnName || selectedOutbound.routeName);
+  if (selectedInbound?.timeEstimated || selectedOutbound?.timeEstimated) fallbacks.push("도착시간 추정");
   const fallbackNames = [...new Set(fallbacks.filter(Boolean))];
   const inboundMinutes = selectedInbound ? Math.round(Number(selectedInbound.minutesToCompany)) : null;
   const outboundMinutes = selectedOutbound ? Math.round(Number(selectedOutbound.minutesFromCompany)) : null;
@@ -75,6 +76,33 @@ export function apartmentStopTimings(entries) {
   };
 }
 
+function hasDirectionMinutes(entry, direction) {
+  const field = direction === "출근" ? "minutesToCompany" : "minutesFromCompany";
+  const value = entry[field];
+  return value !== null && value !== "" && value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0;
+}
+
+function apartmentLinkEntries(link, stations) {
+  const directions = new Set(link?.directions || []);
+  const routes = new Set(link?.routes || []);
+  const entries = (stations.get(link?.stationId)?.entries || []).filter(entry => {
+    const direction = entry.direction || entry.routeCategory;
+    return !directions.size || directions.has(direction);
+  });
+  if (!routes.size) return entries;
+  const preferred = new Set(["출근", "퇴근"].filter(direction => entries.some(entry => {
+    return (entry.direction || entry.routeCategory) === direction && routes.has(entry.routeName) && hasDirectionMinutes(entry, direction);
+  })));
+  return entries.filter(entry => {
+    const direction = entry.direction || entry.routeCategory;
+    return routes.has(entry.routeName) || !preferred.has(direction);
+  });
+}
+
+export function apartmentLinkTimings(link, stations) {
+  return apartmentStopTimings(apartmentLinkEntries(link, stations));
+}
+
 export function apartmentDoorTimes(timing, distanceKm) {
   const walking = Number.isFinite(Number(distanceKm)) ? Math.max(0, Math.ceil(Number(distanceKm) * 12.5)) : 0;
   return {
@@ -86,15 +114,26 @@ export function apartmentDoorTimes(timing, distanceKm) {
 export function apartmentCommuteTimes(links, stations, maxDistance = Infinity, includeWalking = true) {
   let inbound = null;
   let outbound = null;
-  for (const link of links || []) {
-    if (Number(link.distanceKm) > maxDistance) continue;
-    const timing = apartmentStopTimings(stations.get(link.stationId)?.entries || []);
+  const candidates = (links || []).filter(link => Number(link.distanceKm) <= maxDistance).map(link => ({
+    link,
+    entries: apartmentLinkEntries(link, stations)
+  }));
+  const hasNormalInbound = candidates.some(({ entries }) => entries.some(entry => {
+    return String(entry.turnName).includes("통상 출근") && hasDirectionMinutes(entry, "출근");
+  }));
+  const hasNormalOutbound = candidates.some(({ entries }) => entries.some(entry => {
+    return String(entry.turnName).includes("통상 18시퇴근") && hasDirectionMinutes(entry, "퇴근");
+  }));
+  for (const { link, entries } of candidates) {
+    const timing = apartmentStopTimings(entries);
     const walkingMinutes = includeWalking ? Math.max(0, Math.ceil(Number(link.distanceKm) * 12.5)) : 0;
-    if (Number.isFinite(timing.inboundMinutes)) {
+    const normalInbound = entries.some(entry => String(entry.turnName).includes("통상 출근") && hasDirectionMinutes(entry, "출근"));
+    const normalOutbound = entries.some(entry => String(entry.turnName).includes("통상 18시퇴근") && hasDirectionMinutes(entry, "퇴근"));
+    if (Number.isFinite(timing.inboundMinutes) && (!hasNormalInbound || normalInbound)) {
       const candidate = { shuttleMinutes: timing.inboundMinutes, walkingMinutes, totalMinutes: timing.inboundMinutes + walkingMinutes, stationId: link.stationId };
       if (!inbound || candidate.totalMinutes < inbound.totalMinutes) inbound = candidate;
     }
-    if (Number.isFinite(timing.outboundMinutes)) {
+    if (Number.isFinite(timing.outboundMinutes) && (!hasNormalOutbound || normalOutbound)) {
       const candidate = { shuttleMinutes: timing.outboundMinutes, walkingMinutes, totalMinutes: timing.outboundMinutes + walkingMinutes, stationId: link.stationId };
       if (!outbound || candidate.totalMinutes < outbound.totalMinutes) outbound = candidate;
     }

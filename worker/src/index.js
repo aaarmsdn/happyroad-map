@@ -90,16 +90,34 @@ async function routeBody(request, limit = 1024) {
   }
 }
 
+function validDepartureTime(value, now = Date.now()) {
+  const match = String(value || "").match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})$/);
+  if (!match) return false;
+  const [, year, month, day, hour, minute] = match.map(Number);
+  const wallClock = Date.UTC(year, month - 1, day, hour, minute);
+  const parsed = new Date(wallClock);
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day
+    || parsed.getUTCHours() !== hour || parsed.getUTCMinutes() !== minute) return false;
+  const timestamp = wallClock - 9 * 60 * 60 * 1000;
+  return timestamp > now && timestamp <= now + 7 * 24 * 60 * 60 * 1000;
+}
+
 const validRoute = body => body && koreaPoint(body.start) && koreaPoint(body.end)
-  && ["car", "walk", "public-transit"].includes(body.mode);
+  && ["car", "walk", "public-transit"].includes(body.mode)
+  && (body.departureTime === undefined || (body.mode === "car" && validDepartureTime(body.departureTime)));
+
+const futureRouteAuthorized = (request, env, routes) => !routes.some(route => route.departureTime)
+  || Boolean(env.SHUTTLE_ESTIMATE_TOKEN)
+    && request.headers.get("x-happyroad-estimate-token") === env.SHUTTLE_ESTIMATE_TOKEN;
 
 async function resolveRoute(body, env, fetcher) {
   const upstream = body.mode === "car"
-    ? new URL("https://apis-navi.kakaomobility.com/v1/directions")
+    ? new URL(`https://apis-navi.kakaomobility.com/v1/${body.departureTime ? "future/" : ""}directions`)
     : new URL(`https://dapi.kakao.com/v2/routing/${body.mode === "walk" ? "walk" : "publictraffic"}`);
   if (body.mode === "car") {
     upstream.searchParams.set("origin", `${body.start.lng},${body.start.lat}`);
     upstream.searchParams.set("destination", `${body.end.lng},${body.end.lat}`);
+    if (body.departureTime) upstream.searchParams.set("departure_time", body.departureTime);
     upstream.searchParams.set("summary", "false");
   } else {
     upstream.searchParams.set("start_x", body.start.lng);
@@ -154,6 +172,7 @@ export async function handleRequest(request, env, fetcher = fetch) {
         || body.routes.some((route, index) => route.id !== index || !validRoute(route))) {
         return json({ error: "invalid_routes" }, 400, origin);
       }
+      if (!futureRouteAuthorized(request, env, body.routes)) return json({ error: "forbidden_future_route" }, 403, origin);
       for (let index = 1; index < body.routes.length; index += 1) {
         const allowance = await env.ROUTE_RATE_LIMITER.limit({ key: actor });
         if (!allowance.success) return json({ error: "rate_limited" }, 429, origin);
@@ -171,6 +190,7 @@ export async function handleRequest(request, env, fetcher = fetch) {
       if (!validRoute(body)) {
         return json({ error: "invalid_route" }, 400, origin);
       }
+      if (!futureRouteAuthorized(request, env, [body])) return json({ error: "forbidden_future_route" }, 403, origin);
       const result = await resolveRoute(body, env, fetcher);
       return result ? json(result, 200, origin) : json({ error: "route_not_found" }, 404, origin);
     }
