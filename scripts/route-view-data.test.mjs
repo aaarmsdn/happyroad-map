@@ -64,6 +64,10 @@ test("generated estimates fill every missing shuttle duration without changing s
   const window = {};
   const context = { window };
   vm.runInNewContext(await readFile(new URL("../public/data/shuttle-data.js", import.meta.url), "utf8"), context);
+  const expected = window.HAPPYROAD_MAP_DATA.entries.filter(entry => {
+    const field = entry.direction === "출근" ? "minutesToCompany" : entry.direction === "퇴근" ? "minutesFromCompany" : null;
+    return field && (entry[field] === null || entry[field] === "" || entry[field] === undefined);
+  }).length;
   vm.runInNewContext(await readFile(new URL("../public/data/shuttle-time-estimates.js", import.meta.url), "utf8"), context);
   const missing = window.HAPPYROAD_MAP_DATA.entries.filter(entry => {
     const field = entry.direction === "출근" ? "minutesToCompany" : entry.direction === "퇴근" ? "minutesFromCompany" : null;
@@ -71,7 +75,7 @@ test("generated estimates fill every missing shuttle duration without changing s
   });
   const gongdeok = window.HAPPYROAD_MAP_DATA.entries.find(entry => entry.routeName === "신길선" && entry.station === "공덕역 7번출구");
 
-  assert.equal(window.HAPPYROAD_SHUTTLE_TIME_ESTIMATES.count, 190);
+  assert.equal(window.HAPPYROAD_SHUTTLE_TIME_ESTIMATES.count, expected);
   assert.equal(missing.length, 0);
   assert.equal(gongdeok.turnName, "통상 18시퇴근");
   assert.equal(gongdeok.timeEstimated, true);
@@ -83,22 +87,22 @@ test("generated estimates never overwrite an authoritative shuttle duration", as
   const context = { window };
   vm.runInNewContext(await readFile(new URL("../public/data/shuttle-data.js", import.meta.url), "utf8"), context);
   const source = await readFile(new URL("../public/data/shuttle-time-estimates.js", import.meta.url), "utf8");
-  const [payloadSource, applySource] = source.trim().split("\n");
-  vm.runInNewContext(payloadSource, context);
-  const estimateKey = Object.keys(window.HAPPYROAD_SHUTTLE_TIME_ESTIMATES.estimates)[0];
+  const payloadWindow = {};
+  vm.runInNewContext(source, { window: payloadWindow });
+  const estimateKey = Object.keys(payloadWindow.HAPPYROAD_SHUTTLE_TIME_ESTIMATES.estimates)[0];
   const [turnUid, stopOrder, stationUid] = estimateKey.split(":");
   const entry = window.HAPPYROAD_MAP_DATA.entries.find(item => item.turnUid === turnUid && String(item.stopOrder) === stopOrder && item.stationUid === stationUid);
   const field = entry.direction === "출근" ? "minutesToCompany" : "minutesFromCompany";
   entry[field] = 7;
   entry.time = "12:34";
   entry.sourceTimeText = "원본 시간";
-  vm.runInNewContext(applySource, context);
+  vm.runInNewContext(source, context);
   assert.equal(entry[field], 7);
   assert.equal(entry.time, "12:34");
   assert.equal(entry.sourceTimeText, "원본 시간");
 
   entry[field] = null;
-  vm.runInNewContext(applySource, context);
+  vm.runInNewContext(source, context);
   assert.ok(entry[field] > 0);
   assert.equal(entry.time, "12:34");
   assert.equal(entry.sourceTimeText, "원본 시간");
