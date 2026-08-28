@@ -5,7 +5,23 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { comparableName, summarize } from "./price-refresh-lib.mjs";
+import { comparableName, parseTrades, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
+
+test("reviewed aliases cover known Gangnam official-name variants", async () => {
+  const aliases = JSON.parse(await readFile(new URL("../config/price-name-aliases.json", import.meta.url), "utf8"));
+  assert.deepEqual(aliases["154"], ["선경1차(1동-7동)", "선경2차(8동-12동)"]);
+  assert.deepEqual(aliases["419"], ["삼익대청"]);
+  assert.deepEqual(aliases["483"], ["성원대치2단지"]);
+  assert.deepEqual(aliases["818"], ["우성8"]);
+});
+
+test("MOLIT parser preserves official address identity fields", () => {
+  const [trade] = parseTrades(`<items><item><aptNm>성원대치2단지아파트</aptNm><umdNm>개포동</umdNm><jibun>12</jibun><roadNm>개포로</roadNm><roadNmBonbun>12</roadNmBonbun><roadNmBubun>3</roadNmBubun><buildYear>1992</buildYear><excluUseAr>49.86</excluUseAr><dealAmount>205,500</dealAmount><dealYear>2026</dealYear><dealMonth>7</dealMonth><dealDay>30</dealDay></item></items>`);
+  assert.deepEqual(trade, {
+    name: "성원대치2단지아파트", legalDong: "개포동", jibun: "12", roadName: "개포로", roadMain: "12", roadSub: "3", buildYear: 1992,
+    area: 49.86, amount: 205500, date: "20260730"
+  });
+});
 
 test("trade summaries include arithmetic averages and per-pyeong extrema", () => {
   assert.deepEqual(summarize([
@@ -31,6 +47,11 @@ test("comparable apartment names ignore punctuation variants", () => {
   assert.equal(comparableName("효자촌(임광)"), comparableName("효자촌임광"));
   assert.equal(comparableName("이편한세상센트레빌"), comparableName("e편한세상센트레빌"));
   assert.equal(comparableName("한강자이(고층)"), comparableName("한강자이"));
+});
+
+test("cross-region reviewed aliases remain distinguishable from unknown names", () => {
+  assert.equal(unmatchedNameReason([], ["419"]), "region_mismatch");
+  assert.equal(unmatchedNameReason([], []), "name_not_found");
 });
 
 test("price refresh matches official neighborhood-prefixed apartment names", async () => {
@@ -84,7 +105,7 @@ globalThis.fetch = async url => {
   requests += 1;
   if (requests === 1) throw new TypeError("temporary network failure");
   months.push(new URL(url).searchParams.get("DEAL_YMD"));
-  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>11</totalCount><items><item><aptNm>자양우성7</aptNm><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><excluUseAr>133</excluUseAr><dealAmount>180,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>한강자이(고층)</aptNm><excluUseAr>133</excluUseAr><dealAmount>181,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>88,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>서울테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>광진테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>95,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>4</dealDay></item><item><aptNm>서울샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>70,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>5</dealDay></item><item><aptNm>광진샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>75,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>6</dealDay></item><item><aptNm>공식별칭파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>80,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>7</dealDay></item><item><aptNm>서울별칭파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>82,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>8</dealDay></item></items></body></response>\`, { status: 200 });
+  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>11</totalCount><items><item><aptNm>자양우성7</aptNm><umdNm>자양동</umdNm><jibun>100</jibun><buildYear>1995</buildYear><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><excluUseAr>133</excluUseAr><dealAmount>180,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>한강자이(고층)</aptNm><excluUseAr>133</excluUseAr><dealAmount>181,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>88,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>서울테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>광진테스트파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>95,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>4</dealDay></item><item><aptNm>서울샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>70,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>5</dealDay></item><item><aptNm>광진샘플파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>75,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>6</dealDay></item><item><aptNm>공식별칭파크</aptNm><excluUseAr>84</excluUseAr><dealAmount>80,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>7</dealDay></item><item><aptNm>서울별칭파크</aptNm><umdNm>자양동</umdNm><jibun>200</jibun><roadNm>한강로</roadNm><roadNmBonbun>20</roadNmBonbun><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>82,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>8</dealDay></item></items></body></response>\`, { status: 200 });
 };
 process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQUESTS=\${requests}\`));`);
 
@@ -123,8 +144,14 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
     assert.equal(prices.complexes["103"], undefined);
     assert.equal(prices.complexes["104"].matchedTradeCount, 12);
     assert.deepEqual(prices.complexes["104"].matchedOfficialNames, ["공식별칭파크"]);
+    assert.deepEqual(prices.complexes["97"].matchedOfficialAddresses, ["자양동 100"]);
+    assert.deepEqual(prices.complexes["97"].matchedBuildYears, [1995]);
     assert.equal(prices.refresh.matchedByUniqueContainment, 24);
     assert.equal(prices.refresh.skippedAmbiguous, 72);
+    assert.deepEqual(prices.refresh.unmatchedOfficialTrades.find(item => item.officialName === "서울별칭파크"), {
+      regionCode: "11215", officialName: "서울별칭파크", legalDong: "자양동", jibun: "200",
+      roadAddress: "한강로 20", buildYear: 2001, reason: "ambiguous_name", count: 12
+    });
     const months = result.stderr.match(/FETCH_MONTHS=([^\r\n]+)/)?.[1].split(",") || [];
     assert.equal(months.length, 12);
     assert.equal(new Set(months).size, 12);

@@ -19,6 +19,10 @@ export function numberSignature(value) {
   return normalizeName(value).match(/\d+/g)?.join(":") || "";
 }
 
+export function unmatchedNameReason(exactIds, aliasIds) {
+  return exactIds.length || aliasIds.length ? "region_mismatch" : "name_not_found";
+}
+
 export function xmlValue(item, tag) {
   const match = item.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`));
   return match?.[1]?.trim()
@@ -46,6 +50,12 @@ export function parseTrades(xml) {
     const day = xmlValue(item, "dealDay").padStart(2, "0");
     return {
       name: xmlValue(item, "aptNm"),
+      legalDong: xmlValue(item, "umdNm"),
+      jibun: xmlValue(item, "jibun"),
+      roadName: xmlValue(item, "roadNm"),
+      roadMain: xmlValue(item, "roadNmBonbun"),
+      roadSub: xmlValue(item, "roadNmBubun"),
+      buildYear: Number(xmlValue(item, "buildYear")) || null,
       area: Number(xmlValue(item, "excluUseAr")),
       amount: Number(xmlValue(item, "dealAmount").replaceAll(",", "")),
       date: `${year}${month}${day}`

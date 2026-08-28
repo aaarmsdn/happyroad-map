@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { areaBand, comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize } from "./price-refresh-lib.mjs";
+import { areaBand, comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -101,12 +101,16 @@ for (const trade of trades) {
   }
   const tradeName = comparableName(trade.name);
   const tradeNumbers = numberSignature(trade.name);
-  const candidates = (complexesByRegion.get(trade.regionCode) || []).filter(complex => {
+  let candidates = (complexesByRegion.get(trade.regionCode) || []).filter(complex => {
     const complexName = comparableName(complex.name);
     return Math.min(tradeName.length, complexName.length) >= 4
       && numberSignature(complex.name) === tradeNumbers
       && (tradeName.includes(complexName) || complexName.includes(tradeName));
   });
+  if (candidates.length > 1 && trade.buildYear) {
+    const sameBuildYear = candidates.filter(complex => Number(String(complex.completed || "").slice(0, 4)) === trade.buildYear);
+    if (sameBuildYear.length === 1) candidates = sameBuildYear;
+  }
   const ids = candidates.length === 1 ? [candidates[0].id] : [];
   inferredIdsByTradeName.set(cacheKey, ids);
   if (ids.length) {
@@ -128,13 +132,30 @@ let skippedNoName = 0;
 let skippedRegionMismatch = 0;
 let matchedByAlias = 0;
 let matchedByUniqueContainment = 0;
+const unmatchedOfficialTrades = new Map();
+const rememberUnmatched = (trade, reason) => {
+  const key = [trade.regionCode, trade.name, trade.legalDong, trade.jibun, trade.roadName, trade.roadMain, trade.roadSub, trade.buildYear].join("|");
+  const existing = unmatchedOfficialTrades.get(key);
+  if (existing) existing.count += 1;
+  else unmatchedOfficialTrades.set(key, {
+    regionCode: trade.regionCode,
+    officialName: trade.name,
+    legalDong: trade.legalDong || null,
+    jibun: trade.jibun || null,
+    roadAddress: trade.roadName ? `${trade.roadName} ${trade.roadMain || ""}${trade.roadSub && trade.roadSub !== "0" ? `-${trade.roadSub}` : ""}`.trim() : null,
+    buildYear: trade.buildYear,
+    reason,
+    count: 1
+  });
+};
 for (const trade of trades) {
   const band = areaBand(trade.area);
   const ids = idsByName.get(normalizeName(trade.name)) || [];
+  const aliasIds = idsByAlias.get(normalizeName(trade.name)) || [];
   let regionIds = ids.filter(id => regionByComplex.get(id) === trade.regionCode);
   let matchMethod = "normalized_name_and_lawd_cd_from_boundary";
   if (!regionIds.length) {
-    regionIds = (idsByAlias.get(normalizeName(trade.name)) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
+    regionIds = aliasIds.filter(id => regionByComplex.get(id) === trade.regionCode);
     if (regionIds.length) matchMethod = "configured_alias_and_lawd_cd_from_boundary";
   }
   if (!regionIds.length) {
@@ -143,6 +164,7 @@ for (const trade of trades) {
     if (regionIds.length) matchMethod = "unique_containment_name_and_lawd_cd_from_boundary";
     else if (collidingInferredKeys.has(cacheKey)) {
       skippedAmbiguous += 1;
+      rememberUnmatched(trade, "ambiguous_name");
       continue;
     }
   }
@@ -152,10 +174,12 @@ for (const trade of trades) {
     } else {
       skippedNoName += 1;
     }
+    rememberUnmatched(trade, unmatchedNameReason(ids, aliasIds));
     continue;
   }
   if (regionIds.length !== 1) {
     skippedAmbiguous += 1;
+    rememberUnmatched(trade, "ambiguous_name");
     continue;
   }
   if (matchMethod === "configured_alias_and_lawd_cd_from_boundary") matchedByAlias += 1;
@@ -194,6 +218,8 @@ for (const [complexId, complexTrades] of grouped) {
   record.latestTradeDate = complexTrades.map(trade => trade.date).sort().at(-1);
   record.source = "국토교통부 아파트 매매 실거래가 API";
   record.matchedOfficialNames = [...new Set(complexTrades.map(trade => trade.name))].sort((a, b) => a.localeCompare(b, "ko"));
+  record.matchedOfficialAddresses = [...new Set(complexTrades.map(trade => [trade.legalDong, trade.jibun].filter(Boolean).join(" ")).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko"));
+  record.matchedBuildYears = [...new Set(complexTrades.map(trade => trade.buildYear).filter(Boolean))].sort((a, b) => a - b);
   const overall = summarize(complexTrades);
   record.min = overall.min;
   record.average = overall.average;
@@ -228,7 +254,8 @@ prices.refresh = {
   skippedRegionMismatch,
   skippedAmbiguous,
   matchedByAlias,
-  matchedByUniqueContainment
+  matchedByUniqueContainment,
+  unmatchedOfficialTrades: [...unmatchedOfficialTrades.values()].sort((a, b) => a.regionCode.localeCompare(b.regionCode) || a.officialName.localeCompare(b.officialName, "ko"))
 };
 apartments.areaTagsGeneratedAt = generatedAt;
 apartments.source.areaTagSource = "국토교통부 아파트 매매 실거래가 API";
