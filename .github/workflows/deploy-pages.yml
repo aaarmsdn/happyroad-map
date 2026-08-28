@@ -24,8 +24,12 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
-      - name: Run tests
-        run: npm test
+      - name: Run unit and data tests
+        run: node --test scripts/browser-route-mock.test.mjs scripts/commute-routing.test.mjs scripts/filter-logic.test.mjs scripts/map-cluster.test.mjs scripts/map-view.test.mjs scripts/price-refresh.test.mjs scripts/region-match.test.mjs scripts/route-view-data.test.mjs scripts/school-data.test.mjs scripts/ui-contract.test.mjs scripts/ui-data.test.mjs scripts/worker-route-geometry.test.mjs scripts/worker.test.mjs
+      - name: Run browser tests
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node --test scripts/price-metric.browser.test.mjs
       - name: Validate deploy data
         run: npm run check
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
