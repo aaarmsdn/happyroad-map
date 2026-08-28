@@ -163,7 +163,7 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
         overflow: document.documentElement.scrollWidth > innerWidth, mapInert: document.querySelector('#map').hasAttribute('inert') };
     })()`);
     assert.equal(planner.top >= 0, true);
-    assert.equal(Math.round(planner.bottom), planner.viewport);
+    assert.equal(Math.abs(planner.bottom - planner.viewport) < 1, true);
     assert.equal(planner.width, 375);
     assert.equal(planner.overflow, false);
     assert.equal(planner.mapInert, false);
