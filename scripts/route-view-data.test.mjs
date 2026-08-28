@@ -82,7 +82,16 @@ test("generated estimates never overwrite an authoritative shuttle duration", as
   const field = entry.direction === "출근" ? "minutesToCompany" : "minutesFromCompany";
   entry[field] = 7;
   entry.time = "12:34";
+  entry.sourceTimeText = "원본 시간";
   vm.runInNewContext(applySource, context);
   assert.equal(entry[field], 7);
   assert.equal(entry.time, "12:34");
+  assert.equal(entry.sourceTimeText, "원본 시간");
+
+  entry[field] = null;
+  vm.runInNewContext(applySource, context);
+  assert.ok(entry[field] > 0);
+  assert.equal(entry.time, "12:34");
+  assert.equal(entry.sourceTimeText, "원본 시간");
+  assert.equal(entry.timeEstimated, undefined);
 });

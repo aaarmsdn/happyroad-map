@@ -74,6 +74,7 @@ function addAccessibleMarker(marker, layer, label) {
   const element = marker.getElement();
   element?.setAttribute("aria-label", label);
   element?.setAttribute("role", "button");
+  element?.setAttribute("tabindex", "0");
   element?.addEventListener("keydown", event => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -248,7 +249,7 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
         : colorMode === "price" && perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : "";
       const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, price, colorOf(metric), apartmentDirectionOpacity(single.link, category)), zIndexOffset: 200 });
       marker.bindTooltip(`${escapeHtml(single.complex.name)}${price ? ` · ${formatPrice(price)}` : ""}${metricLabel}`, { direction: "top" });
-      marker.on("click", () => onSelect(single.complex));
+      marker.on("click", event => onSelect(single.complex, event.target.getElement()));
       addAccessibleMarker(marker, layer, single.complex.name);
     }
     return;
@@ -264,7 +265,7 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
     const metricLabel = colorMode === "commute" && roundTrip ? ` · 왕복 ${roundTrip}분`
       : colorMode === "price" && perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : "";
     marker.bindTooltip(`${escapeHtml(item.complex.name)}${price ? ` · ${formatPrice(price)}` : ""}${metricLabel}`, { direction: "top" });
-    marker.on("click", () => onSelect(item.complex));
+    marker.on("click", event => onSelect(item.complex, event.target.getElement()));
     addAccessibleMarker(marker, layer, item.complex.name);
   });
 }

@@ -142,6 +142,6 @@ const payload = {
   estimates
 };
 const source = `window.HAPPYROAD_SHUTTLE_TIME_ESTIMATES=${JSON.stringify(payload)};\n` +
-  `for(const entry of window.HAPPYROAD_MAP_DATA?.entries||[]){const estimate=window.HAPPYROAD_SHUTTLE_TIME_ESTIMATES.estimates[\`${"${entry.turnUid}:${entry.stopOrder}:${entry.stationUid}"}\`],field=entry.direction==="출근"?"minutesToCompany":entry.direction==="퇴근"?"minutesFromCompany":null;if(estimate&&field&&(entry[field]===null||entry[field]===""||entry[field]===undefined))Object.assign(entry,estimate);}\n`;
+  `for(const entry of window.HAPPYROAD_MAP_DATA?.entries||[]){const estimate=window.HAPPYROAD_SHUTTLE_TIME_ESTIMATES.estimates[\`${"${entry.turnUid}:${entry.stopOrder}:${entry.stationUid}"}\`],field=entry.direction==="출근"?"minutesToCompany":entry.direction==="퇴근"?"minutesFromCompany":null;if(estimate&&field&&(entry[field]===null||entry[field]===""||entry[field]===undefined)){entry[field]=estimate[field];if(entry.displayMinutes===null||entry.displayMinutes===""||entry.displayMinutes===undefined)entry.displayMinutes=estimate.displayMinutes;if(entry.time===null||entry.time===""||entry.time===undefined){entry.time=estimate.time;entry.timeEstimated=true}if(!entry.sourceTimeText)entry.sourceTimeText=estimate.sourceTimeText}}\n`;
 await writeFile(outputUrl, source, "utf8");
 console.log(`셔틀 누락시간 ${expected}건 추정 완료`);

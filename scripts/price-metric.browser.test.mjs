@@ -96,6 +96,7 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
         .map(item => item.closest('.leaflet-marker-icon')).find(item => item?.getBoundingClientRect().width > 0);
       if (!marker) return null;
       const name = marker.getAttribute('aria-label').split(' · ')[0];
+      marker.focus();
       marker.click();
       return name;
     })()`));
@@ -109,6 +110,8 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
     await waitFor(() => evaluate("document.querySelector('#detailContent h2').textContent === " + JSON.stringify(apartmentName)));
     assert.equal(await evaluate("document.querySelector('#detailPanel').classList.contains('open')"), true);
     await evaluate("document.querySelector('#detailCloseButton').click(); true");
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(await evaluate("document.activeElement !== document.body && document.activeElement.id !== 'detailCloseButton'"), true);
     });
     await t.test("map picking uses marker names and reverse-geocoded blank-map addresses", async () => {
     await evaluate(`(() => {

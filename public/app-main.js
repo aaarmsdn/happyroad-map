@@ -4,7 +4,7 @@ import { createCommutePlanner } from "./commute-controller.js?v=41";
 import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=44";
 import { apartmentColor, apartmentCommuteTimes, apartmentDoorTimes, apartmentLinkTimings, apartmentRoundTripMinutes, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceFor, pricePerPyeongFor, priceRecordForDisplay, prioritizeCommuteLinks, routeRequestForStop } from "./filter-data.js?v=37";
 import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=12";
-import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=58";
+import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=60";
 import { addRoutePaths } from "./route-view.js?v=4";
 import { createRequestGate } from "./request-gate.js?v=1";
 import { nearestSchools } from "./school-data.js?v=2";
@@ -42,6 +42,7 @@ let visibleLinks = new Map();
 let toastTimer;
 let storageWarningShown = false;
 let detailReturnFocus;
+let detailReturnFocusLabel;
 let selectedApartmentDetail;
 let apartmentStopDetailOpen = false;
 const apartmentDetailRequests = createRequestGate();
@@ -143,7 +144,7 @@ function renderMap() {
     })(),
     colorMode: state.apartmentColor,
     colorOf: value => state.apartmentColor === "commute" ? apartmentColor(state, null, value) : apartmentColor(state, value, null),
-    onSelect: complex => commutePlanner?.pickMapPoint(complex, complex.name) || openApartmentDetail(complex),
+    onSelect: (complex, returnFocus) => commutePlanner?.pickMapPoint(complex, complex.name) || openApartmentDetail(complex, returnFocus),
     category: state.category
   });
   if (state.showSchools && schoolDataStatus === "loaded") addSchoolMarkers({
@@ -163,8 +164,11 @@ function renderMap() {
   lucide.createIcons();
 }
 
-function openDetail(html, preserveReturnFocus = false) {
-  if (!preserveReturnFocus) detailReturnFocus = document.activeElement;
+function openDetail(html, preserveReturnFocus = false, returnFocus = document.activeElement) {
+  if (!preserveReturnFocus) {
+    detailReturnFocus = returnFocus;
+    detailReturnFocusLabel = returnFocus?.getAttribute?.("aria-label") || "";
+  }
   $("#detailContent").innerHTML = html;
   const panel = $("#detailPanel");
   panel.classList.add("open");
@@ -188,11 +192,20 @@ function closeDetail(restoreCommute = true, restoreApartment = false) {
   panel.classList.remove("open");
   panel.inert = true;
   panel.setAttribute("aria-hidden", "true");
-  if (detailReturnFocus?.isConnected) detailReturnFocus.focus();
+  const returnLabel = selectedApartmentDetail?.complex?.name || detailReturnFocusLabel;
+  const labeledFocus = returnLabel
+    ? [...document.querySelectorAll("[aria-label]")].find(element => element.getAttribute("aria-label") === returnLabel)
+    : null;
+  const focusTarget = labeledFocus || (detailReturnFocus?.isConnected ? detailReturnFocus : null);
   detailReturnFocus = null;
+  detailReturnFocusLabel = "";
   apartmentStopDetailOpen = false;
   selectedApartmentDetail = null;
-  if (restoreCommute) commutePlanner?.restoreMapDetail();
+  const commuteRestored = restoreCommute && commutePlanner?.restoreMapDetail();
+  if (!commuteRestored && focusTarget) setTimeout(() => {
+    if (focusTarget.isConnected) focusTarget.focus({ preventScroll: true });
+    if (document.activeElement !== focusTarget) $("#searchButton").focus({ preventScroll: true });
+  }, 0);
 }
 
 function openStopDetail(stop, returnToApartment = false) {
@@ -230,7 +243,7 @@ function renderSelectedApartmentDetail() {
   lucide.createIcons();
 }
 
-async function openApartmentDetail(complex) {
+async function openApartmentDetail(complex, returnFocus = document.activeElement) {
   const request = apartmentDetailRequests.begin();
   const commutePeek = commutePlanner?.beginMapDetail();
   if (!commutePeek) clearRoute();
@@ -238,7 +251,7 @@ async function openApartmentDetail(complex) {
   if (!apartmentDetailRequests.isCurrent(request)) return;
   apartmentStopDetailOpen = false;
   selectedApartmentDetail = { complex };
-  openDetail(selectedApartmentDetailHtml());
+  openDetail(selectedApartmentDetailHtml(), false, returnFocus);
 }
 
 function setPriceMetric(value) {
