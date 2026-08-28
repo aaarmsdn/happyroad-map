@@ -1,4 +1,4 @@
-import { hourOf } from "./filter-logic.js?v=10";
+import { hourOf } from "./filter-logic.js?v=12";
 import { normalize } from "./ui-utils.js?v=10";
 
 export function entryMatches(entry, state) {
@@ -83,17 +83,32 @@ export function apartmentDoorTimes(timing, distanceKm) {
   };
 }
 
-export function apartmentRoundTripMinutes(links, stations, maxDistance = Infinity) {
-  let inbound = Infinity;
-  let outbound = Infinity;
+export function apartmentCommuteTimes(links, stations, maxDistance = Infinity, includeWalking = true) {
+  let inbound = null;
+  let outbound = null;
   for (const link of links || []) {
     if (Number(link.distanceKm) > maxDistance) continue;
     const timing = apartmentStopTimings(stations.get(link.stationId)?.entries || []);
-    const walking = Math.max(0, Math.ceil(Number(link.distanceKm) * 12.5));
-    if (Number.isFinite(timing.inboundMinutes)) inbound = Math.min(inbound, timing.inboundMinutes + walking);
-    if (Number.isFinite(timing.outboundMinutes)) outbound = Math.min(outbound, timing.outboundMinutes + walking);
+    const walkingMinutes = includeWalking ? Math.max(0, Math.ceil(Number(link.distanceKm) * 12.5)) : 0;
+    if (Number.isFinite(timing.inboundMinutes)) {
+      const candidate = { shuttleMinutes: timing.inboundMinutes, walkingMinutes, totalMinutes: timing.inboundMinutes + walkingMinutes, stationId: link.stationId };
+      if (!inbound || candidate.totalMinutes < inbound.totalMinutes) inbound = candidate;
+    }
+    if (Number.isFinite(timing.outboundMinutes)) {
+      const candidate = { shuttleMinutes: timing.outboundMinutes, walkingMinutes, totalMinutes: timing.outboundMinutes + walkingMinutes, stationId: link.stationId };
+      if (!outbound || candidate.totalMinutes < outbound.totalMinutes) outbound = candidate;
+    }
   }
-  return Number.isFinite(inbound) && Number.isFinite(outbound) ? inbound + outbound : null;
+  return { inbound, outbound, roundTripMinutes: inbound && outbound ? inbound.totalMinutes + outbound.totalMinutes : null };
+}
+
+export function apartmentRoundTripMinutes(links, stations, maxDistance = Infinity, includeWalking = true) {
+  return apartmentCommuteTimes(links, stations, maxDistance, includeWalking).roundTripMinutes;
+}
+
+export function prioritizeCommuteLinks(links, commute) {
+  const selected = new Set([commute?.inbound?.stationId, commute?.outbound?.stationId].filter(Boolean));
+  return (links || []).slice().sort((left, right) => Number(selected.has(right.stationId)) - Number(selected.has(left.stationId)) || left.distanceKm - right.distanceKm);
 }
 
 export function stopRepresentativeMinutes(entries) {
@@ -102,16 +117,18 @@ export function stopRepresentativeMinutes(entries) {
   return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
 }
 
-export function matchingApartmentLinks(links, state, stationDirections, complexById) {
+export function matchingApartmentLinks(links, state, stationDirections, complexById, stations, activeEntries) {
   const result = new Map();
+  const linksByComplex = new Map();
   if (!state.area) return result;
   for (const link of links) {
     if (link.distanceKm > state.distance) continue;
-    if (state.travelTime && (!link.travelMinutes || link.travelMinutes > state.travelTime)) continue;
-    if (!stationDirections.has(link.stationId)) continue;
     const complex = complexById.get(link.complexId);
     if (!complex || complex.households < state.households) continue;
     if (state.area !== "전체" && !complex.areaTags.includes(state.area)) continue;
+    if (!stationDirections.has(link.stationId)) continue;
+    if (!linksByComplex.has(link.complexId)) linksByComplex.set(link.complexId, []);
+    linksByComplex.get(link.complexId).push(link);
     const previous = result.get(link.complexId);
     const directions = new Set(previous?.accessDirections);
     for (const direction of stationDirections.get(link.stationId)) directions.add(direction);
@@ -120,6 +137,18 @@ export function matchingApartmentLinks(links, state, stationDirections, complexB
       ...nearest,
       accessDirections: ["출근", "퇴근"].filter(direction => directions.has(direction))
     });
+  }
+  if (!state.inboundTime && !state.outboundTime) return result;
+  const timingStations = activeEntries ? new Map() : stations;
+  for (const entry of activeEntries || []) {
+    if (!entry.stationUid) continue;
+    if (!timingStations.has(entry.stationUid)) timingStations.set(entry.stationUid, { entries: [] });
+    timingStations.get(entry.stationUid).entries.push(entry);
+  }
+  for (const [complexId] of result) {
+    const commute = apartmentCommuteTimes(linksByComplex.get(complexId), timingStations, state.distance, state.includeWalking !== false);
+    if ((state.inboundTime && (!commute.inbound || commute.inbound.totalMinutes > state.inboundTime))
+      || (state.outboundTime && (!commute.outbound || commute.outbound.totalMinutes > state.outboundTime))) result.delete(complexId);
   }
   return result;
 }

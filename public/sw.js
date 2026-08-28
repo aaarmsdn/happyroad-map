@@ -1,17 +1,19 @@
-const CACHE = "happyroad-v142";
+const CACHE = "happyroad-v154";
 const SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=37",
-  "./app-main.js?v=125",
-  "./app-events.js?v=19",
-  "./app-actions.js?v=3",
+  "./styles.css?v=42",
+  "./app-main.js?v=137",
+  "./app-events.js?v=21",
+  "./app-actions.js?v=4",
   "./commute-controller.js?v=41",
   "./commute-view.js?v=8",
-  "./detail-view.js?v=34",
-  "./filter-data.js?v=33",
-  "./filter-logic.js?v=10",
-  "./map-view.js?v=42",
+  "./detail-view.js?v=41",
+  "./filter-data.js?v=36",
+  "./filter-logic.js?v=12",
+  "./map-view.js?v=49",
+  "./school-data.js?v=2",
+  "./request-gate.js?v=1",
   "./route-view.js?v=4",
   "./commute-routing.js?v=34",
   "./korea-boundary.js?v=3",
@@ -48,7 +50,7 @@ self.addEventListener("fetch", event => {
     return;
   }
   const url = new URL(event.request.url);
-  const freshData = url.pathname.endsWith("/prices.json") || url.pathname.endsWith("/apartments.json");
+  const freshData = url.pathname.endsWith("/prices.json") || url.pathname.endsWith("/apartments.json") || url.pathname.endsWith("/schools.json");
   if (freshData) {
     event.respondWith(fetch(event.request).then(async response => {
       if (!response.ok) throw new Error(`Data request failed: ${response.status}`);

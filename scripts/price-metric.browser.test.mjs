@@ -156,7 +156,7 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
     await cdp.call("Input.dispatchMouseEvent", { type: "mousePressed", ...searchMarkerPoint, button: "left", clickCount: 1 }, sessionId);
     await cdp.call("Input.dispatchMouseEvent", { type: "mouseReleased", ...searchMarkerPoint, button: "left", clickCount: 1 }, sessionId);
     assert.equal(await evaluate("document.querySelector('#commutePanel').classList.contains('open')"), false);
-    assert.equal(await evaluate("document.querySelector('#detailPanel').classList.contains('open')"), true);
+    await waitFor(() => evaluate("document.querySelector('#detailPanel').classList.contains('open')"));
     await evaluate("document.querySelector('#detailCloseButton').click(); true");
     assert.equal(await evaluate("document.querySelector('#commutePanel').classList.contains('open')"), true);
     assert.equal(await evaluate("document.querySelector('#commutePlaceQuery').value"), "현재 위치");
@@ -357,7 +357,11 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
 
     await t.test("apartment price metric persists independently", async () => {
     await evaluate("localStorage.clear(); document.querySelector('[data-tab=apartment]').click(); true");
-    await waitFor(() => evaluate("Boolean(document.querySelector('.apartment-price-marker'))"));
+    await waitFor(() => evaluate(`(() => {
+      if (document.querySelector('.apartment-price-marker')) return true;
+      document.querySelector('.apartment-cluster')?.closest('.leaflet-marker-icon')?.click();
+      return false;
+    })()`));
     const maxMarker = await evaluate("document.querySelector('.apartment-price-marker b').textContent.trim()");
     await evaluate("document.querySelector('.apartment-price-marker').closest('.leaflet-marker-icon').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); true");
     await waitFor(() => evaluate("document.querySelector('#detailPanel').classList.contains('open')"));

@@ -3,7 +3,7 @@ import { debounce } from "./ui-utils.js?v=10";
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 
-export function bindEvents({ state, syncControls, renderMap, setPriceMetric, setApartmentColor, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail }) {
+export function bindEvents({ state, syncControls, renderMap, renderSelectedApartmentDetail, setPriceMetric, setApartmentColor, showRoute, renderSearchResults, selectSearchResult, locate, reset, closeDetail }) {
   const mobilePanel = matchMedia("(max-width: 859px)");
   const controlPanel = $("#controlPanel");
   const detailPanel = $("#detailPanel");
@@ -85,11 +85,19 @@ export function bindEvents({ state, syncControls, renderMap, setPriceMetric, set
     state.households = Math.max(0, Number(event.target.value) || 0);
     renderMap();
   });
-  $("#travelTimeMax").addEventListener("change", event => {
-    state.travelTime = Number(event.target.value) || null;
+  for (const [selector, key, outputSelector] of [["#inboundTimeMax", "inboundTime", "#inboundTimeOutput"], ["#outboundTimeMax", "outboundTime", "#outboundTimeOutput"]]) {
+    $(selector).addEventListener("input", event => {
+      state[key] = Number(event.target.value) < 180 ? Number(event.target.value) : null;
+      $(outputSelector).value = state[key] ? `${state[key]}분` : "제한 없음";
+    });
+    $(selector).addEventListener("change", renderMap);
+  }
+  $("#includeWalking").addEventListener("change", event => {
+    state.includeWalking = event.target.checked;
     renderMap();
+    renderSelectedApartmentDetail();
   });
-  [["#showStops", "showStops"], ["#showApartments", "showApartments"]].forEach(([selector, key]) => $(selector).addEventListener("change", event => {
+  [["#showStops", "showStops"], ["#showApartments", "showApartments"], ["#showSchools", "showSchools"]].forEach(([selector, key]) => $(selector).addEventListener("change", event => {
     state[key] = event.target.checked;
     renderMap();
   }));

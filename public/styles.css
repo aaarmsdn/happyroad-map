@@ -12,6 +12,9 @@
   --accent: #b42318;
   --accent-warm: #9f430d;
   --success: #18864b;
+  --school-elementary: #18864b;
+  --school-middle: #2774ae;
+  --school-high: #7d3f67;
   --shadow: 0 8px 24px rgba(30, 41, 50, 0.14);
 }
 
@@ -160,7 +163,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   transition: transform .22s ease, opacity .18s ease;
 }
 .detail-panel.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
-.detail-close { position: sticky; float: right; top: 0; z-index: 2; background: white; }
+.detail-close { position: sticky; display: block; top: 0; z-index: 2; margin: 0 0 4px auto; background: white; }
 .detail-close, #panelCloseButton, #searchCloseButton { width: 44px; height: 44px; }
 .detail-panel h2 { margin: 0 38px 5px 0; overflow-wrap: anywhere; color: var(--ink); font-size: 19px; word-break: keep-all; }
 .detail-meta { margin: 0 0 13px; color: var(--text-muted); font-size: 12px; }
@@ -169,6 +172,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .metric span { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: 10px; }
 .metric b { display: block; overflow: hidden; color: var(--ink); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .detail-panel .metric b { overflow-wrap: anywhere; line-height: 1.25; text-overflow: clip; white-space: normal; word-break: keep-all; }
+.detail-panel .metric small { display: block; margin-top: 4px; color: var(--text-muted); font-size: 9px; line-height: 1.25; white-space: nowrap; }
 .route-list { display: grid; gap: 6px; margin-top: 10px; }
 .route-item { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; text-align: left; background: white; }
 .route-item:hover { border-color: #aab6bc; background: #fafbfb; }
@@ -325,11 +329,38 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .apartment-price-marker::after { position: absolute; bottom: -5px; left: 29px; width: 8px; height: 8px; border-right: 2px solid var(--marker-color, var(--accent)); border-bottom: 2px solid var(--marker-color, var(--accent)); background: white; content: ""; transform: rotate(45deg); }
 .apartment-price-marker svg { width: 13px; height: 13px; color: var(--marker-color, var(--accent)); }
 .apartment-price-marker b { position: relative; z-index: 1; }
+.school-marker { position: relative; display: grid; place-items: center; width: 27px; height: 27px; border: 2px solid white; color: white; background: var(--school-elementary); box-shadow: 0 2px 8px rgba(20,33,61,.3); font-size: 11px; font-weight: 900; }
+.school-marker.elementary { border-radius: 50%; }
+.school-marker.middle { border-radius: 3px; background: var(--school-middle); }
+.school-marker.high { border-radius: 3px; background: var(--school-high); transform: rotate(45deg); }
+.school-marker.high > * { transform: rotate(-45deg); }
+.school-marker svg { width: 15px; height: 15px; stroke-width: 2.5; }
+.school-marker .school-level { position: absolute; right: -3px; bottom: -3px; display: grid; place-items: center; width: 13px; height: 13px; border: 1px solid white; border-radius: 50%; color: white; background: inherit; font-size: 8px; line-height: 1; }
+.school-marker.school-cluster { width: 34px; height: 34px; grid-template-columns: auto auto; gap: 2px; }
+.school-marker.school-cluster b { font-size: 9px; }
+.school-groups { display: grid; gap: 8px; }
+.school-group { padding: 9px 10px; border-left: 3px solid var(--school-middle); background: var(--surface-muted); }
+.school-group:first-child { border-color: var(--school-elementary); }
+.school-group:last-child { border-color: var(--school-high); }
+.school-group h4 { margin: 0 0 5px; color: var(--ink); font-size: 12px; }
+.school-group ol { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.school-group li { display: flex; align-items: start; justify-content: space-between; gap: 8px; font-size: 11px; }
+.school-group li span { min-width: 0; }
+.school-group li b, .school-group li small { display: block; overflow-wrap: anywhere; }
+.school-group li small { margin-top: 2px; color: var(--text-muted); font-size: 9px; }
+.school-group li em { flex: none; color: var(--text-muted); font-style: normal; }
+.school-group p, .school-metrics p { margin: 0; color: var(--text-muted); font-size: 11px; }
 .map-key { position: absolute; z-index: 810; left: 50%; bottom: max(28px, calc(env(safe-area-inset-bottom) + 18px)); display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 5px 9px; border: 1px solid rgba(220,226,229,.95); border-radius: 6px; color: #44515a; background: rgba(255,255,255,.94); box-shadow: 0 3px 12px rgba(30,41,50,.12); transform: translateX(-50%); backdrop-filter: blur(8px); font-size: 11px; font-weight: 700; }
 .map-key span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .map-key svg { width: 14px; height: 14px; }
 .map-key .stop-key { color: var(--ink); }
 .map-key .apartment-key { color: var(--accent); }
+.map-key .school-key { gap: 2px; }
+.map-key .school-key[hidden] { display: none; }
+.map-key .school-key i { display: grid; place-items: center; width: 15px; height: 15px; color: white; background: var(--school-elementary); font-size: 8px; font-style: normal; }
+.map-key .school-key i:first-child { border-radius: 50%; }
+.map-key .school-key i:nth-child(2) { border-radius: 2px; background: var(--school-middle); }
+.map-key .school-key i:nth-child(3) { border-radius: 2px; background: var(--school-high); transform: rotate(45deg); }
 .map-key .price-key { gap: 2px; color: var(--text-muted); font-size: 9px; }
 .map-key .price-key i { width: 8px; height: 8px; border-radius: 50%; background: #18864b; }
 .map-key .price-key i:nth-of-type(2) { background: #2774ae; }
@@ -374,7 +405,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .commute-panel .commute-heading { top: -8px; padding-top: 8px; }
   .commute-panel[data-stage="detail"] { height: 30dvh; max-height: 30dvh; }
   .commute-panel[data-stage="detail"].detail-expanded { height: 68dvh; max-height: 68dvh; }
-  .apartment-metrics { grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); }
+  .apartment-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .map-key { bottom: max(30px, calc(env(safe-area-inset-bottom) + 20px)); }
   .leaflet-bottom.leaflet-left { bottom: calc(8px + env(safe-area-inset-bottom)); }
   .leaflet-bottom.leaflet-right { bottom: calc(8px + env(safe-area-inset-bottom)); }

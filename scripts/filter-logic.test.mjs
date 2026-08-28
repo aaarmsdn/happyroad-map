@@ -28,6 +28,14 @@ test("persisted filters reject wrong types and clamp numeric ranges", () => {
   assert.equal(state.priceMetric, "average");
 });
 
+test("persisted school visibility remains opt-in but restores an explicit choice", () => {
+  const state = { showSchools: false };
+  restoreFilters(state, { showSchools: true });
+  assert.equal(state.showSchools, true);
+  restoreFilters(state, { showSchools: "yes" });
+  assert.equal(state.showSchools, true);
+});
+
 test("all known Seongsu Lotte Castle Park unit sizes remain selectable", async () => {
   const apartments = JSON.parse(await readFile(new URL("../public/data/apartments.json", import.meta.url), "utf8"));
   const complex = apartments.complexes.find(item => item.id === "8104");
@@ -37,7 +45,7 @@ test("all known Seongsu Lotte Castle Park unit sizes remain selectable", async (
 
   for (const area of ["59", "84", "102", "115"]) {
     const result = matchingApartmentLinks(links, {
-      area, distance: 1.5, households: 200, travelTime: null
+      area, distance: 1.5, households: 200, inboundTime: null, outboundTime: null
     }, stationDirections, complexById);
     assert.equal(result.has(complex.id), true, `${area}㎡ filter excluded the complex`);
   }
@@ -46,7 +54,7 @@ test("all known Seongsu Lotte Castle Park unit sizes remain selectable", async (
 test("empty area selection hides every apartment", () => {
   const result = matchingApartmentLinks(
     [{ complexId: "1", stationId: "s", distanceKm: 0.2 }],
-    { area: "", distance: 1, households: 0, travelTime: null },
+    { area: "", distance: 1, households: 0, inboundTime: null, outboundTime: null },
     new Map([["s", new Set(["출근"])]]),
     new Map([["1", { households: 100, areaTags: ["84"] }]])
   );
@@ -60,7 +68,7 @@ test("apartment links retain every accessible commute direction while choosing t
   ];
   const result = matchingApartmentLinks(
     links,
-    { area: "전체", distance: 1.5, households: 0, travelTime: null },
+    { area: "전체", distance: 1.5, households: 0, inboundTime: null, outboundTime: null },
     new Map([["in", new Set(["출근"])], ["out", new Set(["퇴근"])]]),
     new Map([["1", { households: 100, areaTags: ["84"] }]])
   );
@@ -97,6 +105,91 @@ test("apartment round trip falls back to the closest standard clock when normal 
   assert.equal(apartmentRoundTripMinutes(links, stations), 140);
 });
 
+test("apartment commute totals expose shuttle and optional walking time per direction", async () => {
+  const module = await import("../public/filter-data.js");
+  assert.equal(typeof module.apartmentCommuteTimes, "function");
+  const links = [
+    { stationId: "in", distanceKm: 0.72 },
+    { stationId: "out", distanceKm: 1.04 }
+  ];
+  const stations = new Map([
+    ["in", { entries: [{ routeCategory: "출근", turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 55 }] }],
+    ["out", { entries: [{ routeCategory: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 39 }] }]
+  ]);
+
+  assert.deepEqual(module.apartmentCommuteTimes(links, stations, 1.5, true), {
+    inbound: { shuttleMinutes: 55, walkingMinutes: 9, totalMinutes: 64, stationId: "in" },
+    outbound: { shuttleMinutes: 39, walkingMinutes: 13, totalMinutes: 52, stationId: "out" },
+    roundTripMinutes: 116
+  });
+  assert.deepEqual(module.apartmentCommuteTimes(links, stations, 1.5, false), {
+    inbound: { shuttleMinutes: 55, walkingMinutes: 0, totalMinutes: 55, stationId: "in" },
+    outbound: { shuttleMinutes: 39, walkingMinutes: 0, totalMinutes: 39, stationId: "out" },
+    roundTripMinutes: 94
+  });
+});
+
+test("apartment filters use representative inbound and outbound times instead of stale link summaries", () => {
+  const links = [{ complexId: "1", stationId: "both", distanceKm: 0.8, travelMinutes: 10 }];
+  const stations = new Map([["both", { entries: [
+    { routeCategory: "출근", turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 55 },
+    { routeCategory: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 70 }
+  ] }]]);
+  const stationDirections = new Map([["both", new Set(["출근", "퇴근"])]]);
+  const complexes = new Map([["1", { households: 100, areaTags: ["84"] }]]);
+  const base = { area: "전체", distance: 1.5, households: 0, inboundTime: null, outboundTime: null, includeWalking: false };
+
+  assert.equal(matchingApartmentLinks(links, { ...base, inboundTime: 50 }, stationDirections, complexes, stations).has("1"), false);
+  assert.equal(matchingApartmentLinks(links, { ...base, inboundTime: 55, outboundTime: 70 }, stationDirections, complexes, stations).has("1"), true);
+  assert.equal(matchingApartmentLinks(links, { ...base, outboundTime: 65 }, stationDirections, complexes, stations).has("1"), false);
+  assert.equal(matchingApartmentLinks(links, { ...base, inboundTime: 60, includeWalking: true }, stationDirections, complexes, stations).has("1"), false);
+});
+
+test("apartment time filters ignore stations outside the active shuttle scope", () => {
+  const links = [
+    { complexId: "1", stationId: "active", distanceKm: 0.2 },
+    { complexId: "1", stationId: "filtered-out", distanceKm: 0.3 }
+  ];
+  const stations = new Map([
+    ["active", { entries: [{ routeCategory: "출근", turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 90 }] }],
+    ["filtered-out", { entries: [{ routeCategory: "출근", turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 40 }] }]
+  ]);
+  const result = matchingApartmentLinks(
+    links,
+    { area: "전체", distance: 1.5, households: 0, inboundTime: 60, outboundTime: null, includeWalking: false },
+    new Map([["active", new Set(["출근"])]]),
+    new Map([["1", { households: 100, areaTags: ["84"] }]]),
+    stations
+  );
+  assert.equal(result.has("1"), false);
+});
+
+test("apartment time filters ignore inactive directions at an active station", () => {
+  const inbound = { stationUid: "shared", routeCategory: "출근", direction: "출근", turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 55 };
+  const outbound = { stationUid: "shared", routeCategory: "퇴근", direction: "퇴근", turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 70 };
+  const result = matchingApartmentLinks(
+    [{ complexId: "1", stationId: "shared", distanceKm: 0.2 }],
+    { area: "전체", distance: 1.5, households: 0, inboundTime: null, outboundTime: 80, includeWalking: false },
+    new Map([["shared", new Set(["출근"])]]),
+    new Map([["1", { households: 100, areaTags: ["84"] }]]),
+    new Map([["shared", { entries: [inbound, outbound] }]]),
+    [inbound]
+  );
+  assert.equal(result.has("1"), false);
+});
+
+test("commute source stations are promoted ahead of nearer unrelated links", async () => {
+  const module = await import("../public/filter-data.js");
+  assert.equal(typeof module.prioritizeCommuteLinks, "function");
+  const links = [
+    { stationId: "near", distanceKm: 0.1 },
+    { stationId: "inbound", distanceKm: 1.0 },
+    { stationId: "outbound", distanceKm: 1.2 }
+  ];
+  const commute = { inbound: { stationId: "inbound" }, outbound: { stationId: "outbound" } };
+  assert.deepEqual(module.prioritizeCommuteLinks(links, commute).map(link => link.stationId), ["inbound", "outbound", "near"]);
+});
+
 test("apartment color supports price, round-trip time, and plain modes", () => {
   assert.equal(apartmentColor({ apartmentColor: "commute" }, 9000, 119), "#18864b");
   assert.equal(apartmentColor({ apartmentColor: "commute" }, 9000, 120), "#2774ae");
@@ -118,7 +211,7 @@ test("apartment directions follow filtered station entries instead of unrelated 
   ]);
   const result = matchingApartmentLinks(
     links,
-    { area: "전체", distance: 1.5, households: 0, travelTime: null },
+    { area: "전체", distance: 1.5, households: 0, inboundTime: null, outboundTime: null },
     stationDirections,
     new Map([["1", { households: 100, areaTags: ["84"] }]])
   );

@@ -1,5 +1,5 @@
 import { escapeHtml, formatPrice } from "./ui-utils.js?v=10";
-import { stopRepresentativeMinutes } from "./filter-data.js?v=33";
+import { stopRepresentativeMinutes } from "./filter-data.js?v=36";
 
 function clusterItems(items, pointOf, cellSize) {
   const buckets = new Map();
@@ -111,6 +111,49 @@ function apartmentPriceIcon(L, value, color, opacity) {
   return label
     ? markerIcon(L, `<span class="apartment-price-marker" style="--marker-color:${color};opacity:${opacity}"><i data-lucide="building-2"></i><b>${label}</b></span>`, [66, 44])
     : apartmentIcon(L, color, opacity);
+}
+
+const schoolLevelLabels = { elementary: "초", middle: "중", high: "고" };
+const schoolLevelNames = { elementary: "초등학교", middle: "중학교", high: "고등학교" };
+
+function schoolIcon(L, level, count = null) {
+  const clusterClass = count ? " school-cluster" : "";
+  const countHtml = count ? `<b>${count}</b>` : "";
+  const label = schoolLevelLabels[level] || "학";
+  return markerIcon(L, `<span class="school-marker ${level}${clusterClass}" aria-label="${label}"><i data-lucide="graduation-cap" aria-hidden="true"></i><span class="school-level" aria-hidden="true">${label}</span>${countHtml}</span>`, [40, 40]);
+}
+
+export function addSchoolMarkers({ L, map, layer, schools, onSelect }) {
+  const bounds = map.getBounds().pad(0.2);
+  const visible = schools.filter(school => bounds.contains([school.lat, school.lng]));
+  if (map.getZoom() < 14) {
+    const cellSize = 0.05 * 2 ** (13 - map.getZoom());
+    for (const level of Object.keys(schoolLevelLabels)) {
+      const clusters = clusterItems(visible.filter(school => school.level === level), school => [school.lat, school.lng], cellSize);
+      for (const cluster of clusters) {
+        if (cluster.items.length === 1) {
+          const school = cluster.items[0];
+          const marker = L.marker([school.lat, school.lng], { icon: schoolIcon(L, level), zIndexOffset: 150 });
+          marker.bindTooltip(escapeHtml(school.name), { direction: "top" });
+          marker.on("click", () => onSelect(school));
+          addAccessibleMarker(marker, layer, school.name);
+          continue;
+        }
+        const marker = L.marker([cluster.lat, cluster.lng], { icon: schoolIcon(L, level, cluster.items.length), zIndexOffset: 150 });
+        const label = `${schoolLevelNames[level]} ${cluster.items.length.toLocaleString("ko-KR")}개`;
+        marker.bindTooltip(label, { direction: "top" });
+        marker.on("click", () => map.setView([cluster.lat, cluster.lng], Math.min(14, map.getZoom() + 2)));
+        addAccessibleMarker(marker, layer, label);
+      }
+    }
+    return;
+  }
+  visible.forEach(school => {
+    const marker = L.marker([school.lat, school.lng], { icon: schoolIcon(L, school.level), zIndexOffset: 150 });
+    marker.bindTooltip(escapeHtml(school.name), { direction: "top" });
+    marker.on("click", () => onSelect(school));
+    addAccessibleMarker(marker, layer, school.name);
+  });
 }
 
 export function groupStops(entries) {

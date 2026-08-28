@@ -6,9 +6,10 @@ import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(projectDir, "public", "data");
-const [apartments, prices, boundaries, snapshotProvenance] = await Promise.all([
+const [apartments, prices, schools, boundaries, snapshotProvenance] = await Promise.all([
   readFile(path.join(dataDir, "apartments.json"), "utf8").then(JSON.parse),
   readFile(path.join(dataDir, "prices.json"), "utf8").then(JSON.parse),
+  readFile(path.join(dataDir, "schools.json"), "utf8").then(JSON.parse),
   readFile(path.join(projectDir, "config", "sgg.json"), "utf8").then(JSON.parse),
   readFile(path.join(projectDir, "config", "price-snapshot.json"), "utf8").then(JSON.parse)
 ]);
@@ -16,6 +17,13 @@ const [apartments, prices, boundaries, snapshotProvenance] = await Promise.all([
 if (!Array.isArray(apartments.complexes) || apartments.complexes.length < 1) throw new Error("No apartment complexes");
 if (!Array.isArray(apartments.links) || apartments.links.length < 1) throw new Error("No apartment links");
 if (!prices.complexes || Object.keys(prices.complexes).length < 1) throw new Error("No apartment prices");
+if (!Array.isArray(schools.schools) || schools.schools.length < 10000) throw new Error("School location data is incomplete");
+if (!schools.source?.name || !schools.source?.url || !/^\d{4}-\d{2}-\d{2}$/.test(schools.source?.dataDate || "")) throw new Error("School source metadata is incomplete");
+if (new Set(schools.schools.map(school => school.id)).size !== schools.schools.length) throw new Error("School IDs must be unique");
+if (schools.schools.some(school => !school.id || !school.name || !school.address || !/^\d{4}-\d{2}-\d{2}$/.test(school.dataDate || "")
+  || !["elementary", "middle", "high"].includes(school.level)
+  || !Number.isFinite(school.lat) || school.lat < 33 || school.lat > 39
+  || !Number.isFinite(school.lng) || school.lng < 124 || school.lng > 132)) throw new Error("School data contains invalid level or coordinates");
 if (apartments.complexes.some(complex => "listings" in complex)) throw new Error("Apartment listing snapshots must not be committed");
 if (Object.values(prices.complexes).some(record => "naverMarker" in record || "trends" in record)) throw new Error("Third-party price snapshots must not be committed");
 if (JSON.stringify(prices).toLowerCase().includes("naver")) throw new Error("Third-party price provenance must not be committed");
@@ -47,6 +55,7 @@ console.log(JSON.stringify({
   complexes: apartments.complexes.length,
   links: apartments.links.length,
   prices: Object.keys(prices.complexes).length,
+  schools: schools.schools.length,
   districtRegions: new Set(regionCodes).size,
   generatedAt: prices.generatedAt
 }, null, 2));

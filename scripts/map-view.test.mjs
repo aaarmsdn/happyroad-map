@@ -1,7 +1,27 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { routeRequestForStop } from "../public/filter-data.js";
-import { addApartmentMarkers, addStopMarkers, apartmentDirectionOpacity, stopDirectionIcon } from "../public/map-view.js";
+import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, apartmentDirectionOpacity, stopDirectionIcon } from "../public/map-view.js";
+
+test("school markers expose an icon and distinct elementary, middle, and high shapes", async () => {
+  const icons = [];
+  const L = {
+    divIcon: options => { icons.push(options.html); return options; },
+    marker: latLng => ({ addTo() { return this; }, bindTooltip() { return this; }, getElement() { return null; }, getLatLng() { return latLng; }, on() { return this; } })
+  };
+  const map = { getBounds: () => ({ pad: () => ({ contains: () => true }) }), getZoom: () => 15, latLngToLayerPoint: () => ({ x: 0, y: 0 }) };
+  addSchoolMarkers({ L, map, layer: {}, schools: [
+    { id: "e", name: "초등", level: "elementary", lat: 37.5, lng: 127 },
+    { id: "m", name: "중등", level: "middle", lat: 37.51, lng: 127 },
+    { id: "h", name: "고등", level: "high", lat: 37.52, lng: 127 }
+  ], onSelect: () => {} });
+  assert.equal(icons.filter(icon => icon.includes('data-lucide="graduation-cap"')).length, 3);
+  const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.school-marker\.elementary\s*\{[^}]*border-radius:\s*50%/);
+  assert.match(css, /\.school-marker\.middle\s*\{[^}]*border-radius:\s*3px[^}]*--school-middle/);
+  assert.match(css, /\.school-marker\.high\s*\{[^}]*--school-high[^}]*rotate\(45deg\)/);
+});
 import { addJourneyPaths, addRoutePaths, routeSegmentPoints } from "../public/route-view.js";
 
 function encodePolyline(points) {

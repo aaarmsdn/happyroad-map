@@ -19,11 +19,12 @@ test("apartment numeric metadata cannot inject executable HTML", () => {
     complex: { name: "단지", type: "아파트", households: payload, completed: "2026", externalUrl: "" },
     nearestLink: { station: "정류장", distanceKm: 0.2, travelMinutes: payload },
     relatedLinks: [{ station: "정류장", routes: ["노선"], distanceKm: 0.2, travelMinutes: payload }],
+    commute: { inbound: { totalMinutes: payload, shuttleMinutes: payload, walkingMinutes: payload }, roundTripMinutes: payload },
     record: null,
     selectedArea: "전체"
   });
   assert.doesNotMatch(html, /<img/);
-  assert.equal(html.match(/&lt;img/g)?.length, 2);
+  assert.equal(html.match(/&lt;img/g)?.length, 1);
 });
 
 test("apartment area keys cannot inject executable HTML", () => {

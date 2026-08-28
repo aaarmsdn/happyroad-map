@@ -4,9 +4,10 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node --test scripts/browser-route-mock.test.mjs scripts/commute-routing.test.mjs scripts/filter-logic.test.mjs scripts/map-cluster.test.mjs scripts/map-view.test.mjs scripts/price-metric.browser.test.mjs scripts/price-refresh.test.mjs scripts/region-match.test.mjs scripts/route-view-data.test.mjs scripts/ui-contract.test.mjs scripts/ui-data.test.mjs scripts/worker-route-geometry.test.mjs scripts/worker.test.mjs",
+    "test": "node --test scripts/browser-route-mock.test.mjs scripts/commute-routing.test.mjs scripts/filter-logic.test.mjs scripts/map-cluster.test.mjs scripts/map-view.test.mjs scripts/price-metric.browser.test.mjs scripts/price-refresh.test.mjs scripts/region-match.test.mjs scripts/route-view-data.test.mjs scripts/school-data.test.mjs scripts/ui-contract.test.mjs scripts/ui-data.test.mjs scripts/worker-route-geometry.test.mjs scripts/worker.test.mjs",
     "prices:import-snapshot": "node scripts/import-price-snapshot.mjs",
     "prices:refresh": "node scripts/refresh-prices.mjs",
+    "schools:refresh": "node scripts/refresh-schools.mjs",
     "check": "node scripts/check-data.mjs"
   }
 }

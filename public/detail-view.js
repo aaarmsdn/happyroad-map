@@ -1,5 +1,5 @@
 import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
-import { priceMetric, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=33";
+import { priceMetric, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=36";
 
 export function stopDetailHtml(stop) {
   const variants = [...new Map(stop.entries.map(entry => [entry.uidKey, entry])).values()]
@@ -81,15 +81,63 @@ function areaMetrics(record, selectedArea, selectedMetric) {
   }).join("")}</div>`;
 }
 
-export function apartmentDetailHtml({ complex, nearestLink, relatedLinks, record, selectedArea, priceMetric: selectedMetric = "max" }) {
+function commuteMetric(label, value, includeWalking) {
+  if (!value || !Number.isFinite(value.totalMinutes)) return `<div class="metric"><span>${label}</span><b>-</b></div>`;
+  const shuttleMinutes = Number.isFinite(value.shuttleMinutes) ? value.shuttleMinutes : "-";
+  const walkingMinutes = Number.isFinite(value.walkingMinutes) ? value.walkingMinutes : "-";
+  const breakdown = includeWalking
+    ? `셔틀 ${shuttleMinutes} + 도보 ${walkingMinutes}`
+    : `셔틀 ${shuttleMinutes} · 도보 제외`;
+  return `<div class="metric"><span>${label}</span><b>${value.totalMinutes}분</b><small>${breakdown}</small></div>`;
+}
+
+const schoolLevelLabels = { elementary: "초등학교", middle: "중학교", high: "고등학교" };
+
+function schoolSourceHtml(source = {}) {
+  const date = source.dataDate ? ` · 기준일 ${escapeHtml(source.dataDate)}` : "";
+  return `${escapeHtml(source.name || "학교 위치 공공데이터")}${date} · 직선거리`;
+}
+
+function schoolMetricsSourceHtml(source = {}) {
+  const metrics = source.metrics || {};
+  const date = metrics.checkedAt ? ` · 연동 확인일 ${escapeHtml(metrics.checkedAt)}` : "";
+  return `${escapeHtml(metrics.name || "학교알리미")} 학업지표 미연결${date}`;
+}
+
+function nearbySchoolsHtml(schools = {}, source = {}) {
+  const groups = Object.entries(schoolLevelLabels).map(([level, label]) => {
+    const rows = (schools[level] || []).slice(0, 3).map(school => {
+      const metrics = level === "elementary" ? "" : `<small>${schoolMetricsSourceHtml(source)}</small>`;
+      return `<li><span><b>${escapeHtml(school.name)}</b>${metrics}</span><em>${school.distanceKm.toFixed(1)}km</em></li>`;
+    }).join("");
+    return `<section class="school-group"><h4>${label}</h4>${rows ? `<ol>${rows}</ol>` : `<p>위치 자료 없음</p>`}</section>`;
+  }).join("");
+  return `<h3 class="detail-subtitle">가까운 학교</h3><p class="source-note">${schoolSourceHtml(source)} · 학교급별 가까운 3곳</p><div class="school-groups">${groups}</div>`;
+}
+
+export function schoolDetailHtml(school, source = {}) {
+  return `
+    <h2>${escapeHtml(school.name)}</h2>
+    <p class="detail-meta">${schoolLevelLabels[school.level] || "학교"} · ${escapeHtml(school.ownership || "설립형태 미상")}</p>
+    <div class="metric-grid">
+      <div class="metric"><span>거리 자료</span><b>${Number.isFinite(school.lat) && Number.isFinite(school.lng) ? "확인" : "없음"}</b></div>
+      <div class="metric"><span>학업 지표</span><b>미연결</b></div>
+    </div>
+    <p class="empty-note">${schoolMetricsSourceHtml(source)} · 학교알리미에서 개별 확인 필요</p>
+    <p class="source-note">${schoolSourceHtml(source)}</p>
+    <h3 class="detail-subtitle">주소</h3><p class="detail-meta">${escapeHtml(school.address || "주소 자료 없음")}</p>`;
+}
+
+export function apartmentDetailHtml({ complex, nearestLink, relatedLinks, commute, includeWalking = true, record, selectedArea, priceMetric: selectedMetric = "max", schools = {}, schoolSource = {} }) {
   const metric = priceMetric(selectedMetric);
+  const roundTrip = Number.isFinite(commute?.roundTripMinutes) ? `${commute.roundTripMinutes}분` : "-";
   return `
     <h2>${escapeHtml(complex.name).replace("(", "<wbr>(")}</h2>
     <p class="detail-meta">${escapeHtml(complex.type || "아파트")} · ${escapeHtml(complex.households.toLocaleString("ko-KR"))}세대 · ${complex.completed ? `${escapeHtml(complex.completed.slice(0, 4))}년 준공` : "준공일 정보 없음"}</p>
     <div class="metric-grid apartment-metrics">
-      <div class="metric"><span>가까운 정류장</span><b>${escapeHtml(nearestLink?.station || "정보 없음")}</b></div>
-      <div class="metric"><span>거리</span><b>${nearestLink ? `${nearestLink.distanceKm.toFixed(1)} km` : "-"}</b></div>
-      <div class="metric"><span>통근</span><b>${nearestLink?.travelMinutes ? `${escapeHtml(nearestLink.travelMinutes)}분` : "-"}</b></div>
+      ${commuteMetric("출근", commute?.inbound, includeWalking)}
+      ${commuteMetric("퇴근", commute?.outbound, includeWalking)}
+      <div class="metric"><span>왕복</span><b>${roundTrip}</b><small>${includeWalking ? "도보 포함" : "도보 제외"}</small></div>
     </div>
     <h3 class="detail-subtitle">최근 실거래 · ${priceMetricLabels[metric]}</h3>
     <p class="source-note">${record?.matchStatus === "snapshot" ? "국토교통부 공개자료 스냅샷" : "국토교통부 API"} · 최근 거래일 ${formatDate(record?.latestTradeDate)}</p>
@@ -107,5 +155,6 @@ export function apartmentDetailHtml({ complex, nearestLink, relatedLinks, record
         return `<button class="route-item apartment-stop-item" type="button" data-route-name="${escapeHtml(link.routes[0] || "")}"><span><b>${escapeHtml(link.station)}${direction ? ` <em class="direction-badge">${direction}</em>` : ""}</b><small>${escapeHtml(link.routes.slice(0, 2).join(" · ") || "연결 노선")}</small><small class="apartment-stop-times">${times}</small>${inboundDoor}${outboundDoor}${link.fallbackLabel ? `<small class="timing-basis">${escapeHtml(link.fallbackLabel)}</small>` : ""}</span><i data-lucide="chevron-right" aria-hidden="true"></i></button>`;
       }).join("")}
     </div>
+    ${nearbySchoolsHtml(schools, schoolSource)}
     <a class="primary-link" href="${escapeHtml(safeExternalUrl(complex.externalUrl))}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>네이버 부동산에서 현재 매물 보기</a>`;
 }

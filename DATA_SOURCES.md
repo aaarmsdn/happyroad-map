@@ -15,3 +15,12 @@
 ## 행정구역 경계
 
 `config/sgg.json`의 출처, 리비전, 라이선스는 `config/LICENSE-sgg-data`에 기록했습니다.
+
+## 학교 위치
+
+`public/data/schools.json`은 한국교육시설안전원 학구도안내서비스의 `초중고 학교 위치` CSV에서 운영 중인 학교의 이름, 학교급, 설립형태, 주소, 좌표만 추출합니다. 제공기관은 이 자료를 공공데이터로 개방하고 학교 위치 CSV의 갱신주기를 반기(3월, 9월)로 안내합니다. 출처와 데이터 기준일을 앱 상세에 표시하며 실제 배정 학교가 아닌 직선거리 기준 정보입니다.
+
+- 공공데이터 안내: https://schoolzone.emac.kr/publicData/dataInfo.do
+- 공공데이터 목록: https://schoolzone.emac.kr/publicData/publicDataList.do
+
+학업성취도와 진학률은 현재 재배포 가능한 전국 단위 공식 데이터셋을 연결하지 않았습니다. 앱은 값을 추정하지 않고 학교알리미 미연결 상태와 확인일만 표시합니다.

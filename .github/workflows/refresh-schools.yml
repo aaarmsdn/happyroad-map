@@ -1,0 +1,74 @@
+name: Refresh school locations
+
+on:
+  schedule:
+    - cron: "17 20 23 3,9 *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Download official school locations
+        env:
+          SCHOOL_ZIP: ${{ runner.temp }}/schools.zip
+          SCHOOL_CSV: ${{ runner.temp }}/schools.csv
+        run: |
+          node scripts/download-school-location.mjs "$SCHOOL_ZIP"
+          python - <<'PY'
+          import os
+          import shutil
+          import zipfile
+
+          limit = 50 * 1024 * 1024
+          with zipfile.ZipFile(os.environ["SCHOOL_ZIP"]) as archive:
+              files = [entry for entry in archive.infolist() if not entry.is_dir()]
+              if len(files) != 1 or not files[0].filename.lower().endswith(".csv"):
+                  raise SystemExit("School archive must contain exactly one CSV file.")
+              if files[0].file_size > limit:
+                  raise SystemExit("School CSV exceeds 50 MB.")
+              with archive.open(files[0]) as source, open(os.environ["SCHOOL_CSV"], "wb") as target:
+                  shutil.copyfileobj(source, target, 1024 * 1024)
+              if os.path.getsize(os.environ["SCHOOL_CSV"]) != files[0].file_size:
+                  raise SystemExit("School CSV extracted size is invalid.")
+          PY
+          npm run schools:refresh -- "$SCHOOL_CSV"
+      - name: Validate generated data
+        run: npm run check
+      - name: Commit changed schools
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/schools.json
+          git diff --cached --quiet || git commit -m "data: refresh school locations"
+          git push
+  deploy:
+    needs: refresh
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: main
+      - name: Validate deploy data
+        run: npm run check
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
+        with:
+          path: public
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128

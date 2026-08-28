@@ -201,6 +201,63 @@ test("apartment settings expose price, commute, and plain color modes", async ()
   assert.match(html, /data-apartment-color="none"[^>]*>단색/);
 });
 
+test("apartment settings expose directional five-minute commute sliders and walking option", async () => {
+  const html = await read("public/index.html");
+  assert.match(html, /id="inboundTimeMax"[^>]*type="range"[^>]*step="5"/);
+  assert.match(html, /id="outboundTimeMax"[^>]*type="range"[^>]*step="5"/);
+  assert.match(html, /id="includeWalking"[^>]*type="checkbox"[^>]*checked/);
+  assert.doesNotMatch(html, /id="travelTimeMax"/);
+});
+
+test("map settings expose an opt-in school layer", async () => {
+  const html = await read("public/index.html");
+  assert.match(html, /id="showSchools"[^>]*type="checkbox"/);
+  assert.doesNotMatch(html, /id="showSchools"[^>]*checked/);
+});
+
+test("apartment details show three nearest schools for every level", () => {
+  const school = (name, level, distanceKm) => ({ name, level, distanceKm });
+  const html = apartmentDetailHtml({
+    complex: { name: "단지", type: "아파트", households: 100, completed: "2020", externalUrl: "" },
+    nearestLink: null, relatedLinks: [], record: null, selectedArea: "전체",
+    schoolSource: { name: "한국교육시설안전원 초중고 학교 위치", dataDate: "2026-03-20", metrics: { name: "학교알리미", checkedAt: "2026-08-28" } }, schools: {
+      elementary: [school("초1", "elementary", 0.2), school("초2", "elementary", 0.4), school("초3", "elementary", 0.6)],
+      middle: [school("중1", "middle", 0.3), school("중2", "middle", 0.5), school("중3", "middle", 0.7)],
+      high: [school("고1", "high", 0.8), school("고2", "high", 0.9), school("고3", "high", 1.0)]
+    }
+  });
+  assert.match(html, /가까운 학교/);
+  assert.match(html, /초등학교[\s\S]*초1[\s\S]*초2[\s\S]*초3/);
+  assert.match(html, /중학교[\s\S]*중1[\s\S]*학교알리미 학업지표 미연결 · 연동 확인일 2026-08-28/);
+  assert.match(html, /한국교육시설안전원 초중고 학교 위치 · 기준일 2026-03-20/);
+});
+
+test("apartment detail uses auditable representative commute totals instead of stale link time", () => {
+  const html = apartmentDetailHtml({
+    complex: { name: "꽃메마을한라신영프로방스", type: "아파트", households: 388, completed: "2004", externalUrl: "" },
+    nearestLink: { station: "전내교차로", distanceKm: 0.575, travelMinutes: 44 },
+    relatedLinks: [
+      { station: "훼미리프라자", routes: ["보정선"], distanceKm: 0.1, inboundMinutes: 62 },
+      { station: "죽전간이정류장(퇴근)", routes: ["분당경부(토)"], distanceKm: 1.1, outboundMinutes: 39 }
+    ], record: null, selectedArea: "전체",
+    commute: {
+      inbound: { shuttleMinutes: 62, walkingMinutes: 2, totalMinutes: 64 },
+      outbound: { shuttleMinutes: 39, walkingMinutes: 14, totalMinutes: 53 },
+      roundTripMinutes: 117
+    }
+  });
+  assert.match(html, /출근[\s\S]*64분[\s\S]*셔틀 62 \+ 도보 2/);
+  assert.match(html, /퇴근[\s\S]*53분[\s\S]*셔틀 39 \+ 도보 14/);
+  assert.match(html, /왕복[\s\S]*117분/);
+  assert.doesNotMatch(html, /통근[\s\S]*44분/);
+  assert.match(html, /훼미리프라자[\s\S]*죽전간이정류장\(퇴근\)/);
+});
+
+test("walking-time changes refresh an already open apartment detail", async () => {
+  const events = await read("public/app-events.js");
+  assert.match(events, /includeWalking[\s\S]*renderMap\(\);\s*renderSelectedApartmentDetail\(\);/);
+});
+
 test("price summary changes trigger the automatic refresh workflow", async () => {
   const workflow = await read(".github/workflows/refresh-prices.yml");
   assert.match(workflow, /- "scripts\/price-refresh-lib\.mjs"/);

@@ -30,8 +30,10 @@ export function restoreFilters(state, saved) {
   if (saved.startHour === "" || /^(0\d|1\d|2[0-3])$/.test(saved.startHour)) state.startHour = saved.startHour;
   if (Number.isFinite(saved.distance)) state.distance = Math.min(1.5, Math.max(0.2, saved.distance));
   if (Number.isFinite(saved.households)) state.households = Math.max(0, saved.households);
-  if (saved.travelTime === null || [45, 60, 75, 90].includes(saved.travelTime)) state.travelTime = saved.travelTime;
-  for (const key of ["showStops", "showApartments"]) {
+  for (const key of ["inboundTime", "outboundTime"]) {
+    if (saved[key] === null || (Number.isInteger(saved[key]) && saved[key] >= 5 && saved[key] <= 175 && saved[key] % 5 === 0)) state[key] = saved[key];
+  }
+  for (const key of ["includeWalking", "showStops", "showApartments", "showSchools"]) {
     if (typeof saved[key] === "boolean") state[key] = saved[key];
   }
 }
