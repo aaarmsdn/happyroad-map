@@ -12,6 +12,8 @@ permissions:
 
 jobs:
   deploy:
+    env:
+      TZ: Asia/Seoul
     concurrency:
       group: pages
       cancel-in-progress: false
