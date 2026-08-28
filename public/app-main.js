@@ -1,7 +1,7 @@
 import { bindEvents } from "./app-events.js?v=22";
 import { locateUser, populateFilterOptions, resetApp } from "./app-actions.js?v=4";
 import { createCommutePlanner } from "./commute-controller.js?v=41";
-import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=44";
+import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=45";
 import { apartmentColor, apartmentCommuteTimes, apartmentDoorTimes, apartmentLinkTimings, apartmentRoundTripMinutes, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceFor, pricePerPyeongFor, priceRecordForDisplay, prioritizeCommuteLinks, routeRequestForStop } from "./filter-data.js?v=37";
 import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=12";
 import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=60";

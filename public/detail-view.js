@@ -78,7 +78,7 @@ function areaMetrics(record, selectedArea, selectedMetric) {
     const perPyeong = transactionPricePerPyeong(data, area, metric);
     const amountLabel = amount ? formatPrice(amount) : `${priceMetricLabels[metric]} 갱신 대기`;
     const perPyeongLabel = perPyeong ? `평당 ${perPyeong.toLocaleString("ko-KR")}만 · ` : "";
-    return `<div class="price-row"><b>${escapeHtml(area)}㎡</b><span>${amountLabel}</span><small>${perPyeongLabel}${data.count}건 · ${formatPrice(data.min)}~${formatPrice(data.max)}</small></div>`;
+    return `<div class="price-row"><b>${escapeHtml(area)}㎡</b><span>${amountLabel}</span><small>${perPyeongLabel}${data.count}건 · <span class="price-endpoint">${formatPrice(data.min)}</span>~<span class="price-endpoint">${formatPrice(data.max)}</span></small></div>`;
   }).join("")}</div>`;
 }
 

@@ -111,7 +111,7 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
     await waitFor(() => evaluate("document.querySelector('#detailContent h2').textContent === " + JSON.stringify(apartmentName)));
     assert.equal(await evaluate("document.querySelector('#detailPanel').classList.contains('open')"), true);
     await evaluate("document.querySelector('#detailCloseButton').click(); true");
-    await waitFor(() => evaluate("document.activeElement !== document.body && document.activeElement.id !== 'detailCloseButton'"));
+    await waitFor(() => evaluate("document.activeElement?.getAttribute('aria-label') === " + JSON.stringify(apartmentName)));
     });
     await t.test("map picking uses marker names and reverse-geocoded blank-map addresses", async () => {
     await evaluate(`(() => {
