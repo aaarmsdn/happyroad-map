@@ -203,12 +203,20 @@ test("apartment markers render prices and one-direction opacity", () => {
     complexById: new Map([["1", { id: "1", name: "단지", lat: 37.5, lng: 127 }]]),
     priceOf: () => 8500,
     perPyeongOf: () => 3306,
-    colorOf: value => { colorInputs.push(value); return "#f04438"; },
+    colorOf: (value, perPyeong) => { colorInputs.push([value, perPyeong]); return "#f04438"; },
+    onSelect: () => {}
+  });
+  for (const colorMode of ["commute", "none"]) addApartmentMarkers({
+    L, map, layer: {}, category: "전체", colorMode,
+    visibleLinks: new Map([["1", { accessDirections: ["출근"] }]]),
+    complexById: new Map([["1", { id: "1", name: "단지", lat: 37.5, lng: 127 }]]),
+    priceOf: () => 8500, perPyeongOf: () => 3306, roundTripOf: () => 140,
+    colorOf: (value, perPyeong) => { colorInputs.push([value, perPyeong]); return "#f04438"; },
     onSelect: () => {}
   });
   assert.match(iconHtml.join(""), />8,500만</);
   assert.match(iconHtml.join(""), /opacity:0\.45/);
-  assert.deepEqual(colorInputs, [3306]);
+  assert.deepEqual(colorInputs, [[3306, 3306], [140, 3306], [null, 3306]]);
 });
 
 test("apartment markers expose per-pyeong prices when selected areas have no trades", () => {

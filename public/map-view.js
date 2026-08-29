@@ -230,11 +230,13 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
         const values = cluster.items.map(item => colorMode === "commute" ? roundTripOf(item.complex.id) : colorMode === "price" ? perPyeongOf(item.complex.id) : null)
           .filter(value => Number.isFinite(value) && value > 0);
         const average = values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
+        const prices = cluster.items.map(item => perPyeongOf(item.complex.id)).filter(value => Number.isFinite(value) && value > 0);
+        const averagePrice = prices.length ? Math.round(prices.reduce((sum, value) => sum + value, 0) / prices.length) : null;
         const opacity = cluster.items.reduce((sum, item) => sum + apartmentDirectionOpacity(item.link, category), 0) / cluster.items.length;
         const summary = colorMode === "commute" && average ? ` · 평균 왕복 ${average}분`
           : colorMode === "price" && average ? ` · 평균 평당 ${average.toLocaleString("ko-KR")}만` : "";
         const label = `아파트 ${cluster.items.length.toLocaleString("ko-KR")}단지${summary}`;
-        const clusterColor = colorOf(average);
+        const clusterColor = colorOf(average, averagePrice);
         const marker = L.marker([representative.complex.lat, representative.complex.lng], { icon: markerIcon(L, `<span class="map-cluster apartment-cluster" style="--cluster-size:${size}px;--marker-color:${clusterColor};--cluster-ink:${markerInk(clusterColor)};opacity:${opacity}"><i data-lucide="building-2"></i><b>${cluster.items.length}</b></span>`, [44, 44]), zIndexOffset: 200 });
         marker.bindTooltip(label, { direction: "top" });
         marker.on("click", () => map.setView([representative.complex.lat, representative.complex.lng], Math.min(14, map.getZoom() + 2)));
@@ -247,7 +249,7 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
       const metric = colorMode === "commute" ? roundTrip : colorMode === "price" ? perPyeong : null;
       const metricLabel = colorMode === "commute" && roundTrip ? ` · 왕복 ${roundTrip}분`
         : colorMode === "price" && perPyeong ? ` · 평당 ${perPyeong.toLocaleString("ko-KR")}만` : "";
-      const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, price, colorOf(metric), apartmentDirectionOpacity(single.link, category)), zIndexOffset: 200 });
+      const marker = L.marker([single.complex.lat, single.complex.lng], { icon: apartmentPriceIcon(L, price, colorOf(metric, perPyeong), apartmentDirectionOpacity(single.link, category)), zIndexOffset: 200 });
       marker.bindTooltip(`${escapeHtml(single.complex.name)}${price ? ` · ${formatPrice(price)}` : ""}${metricLabel}`, { direction: "top" });
       marker.on("click", event => onSelect(single.complex, event.target.getElement()));
       addAccessibleMarker(marker, layer, single.complex.name);
@@ -259,7 +261,7 @@ export function addApartmentMarkers({ L, map, layer, visibleLinks, complexById, 
     const perPyeong = perPyeongOf(item.complex.id);
     const roundTrip = colorMode === "commute" ? roundTripOf(item.complex.id) : null;
     const metric = colorMode === "commute" ? roundTrip : colorMode === "price" ? perPyeong : null;
-    const color = colorOf(metric);
+    const color = colorOf(metric, perPyeong);
     const icon = apartmentPriceIcon(L, price, color, apartmentDirectionOpacity(item.link, category));
     const marker = L.marker([item.complex.lat, item.complex.lng], { icon, zIndexOffset: 200 });
     const metricLabel = colorMode === "commute" && roundTrip ? ` · 왕복 ${roundTrip}분`

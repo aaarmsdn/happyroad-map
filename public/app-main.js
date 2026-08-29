@@ -4,7 +4,7 @@ import { createCommutePlanner } from "./commute-controller.js?v=41";
 import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=50";
 import { apartmentColor, apartmentCommuteTimes, apartmentDoorTimes, apartmentLinkTimings, apartmentRoundTripMinutes, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceFor, pricePerPyeongFor, priceRecordForDisplay, prioritizeCommuteLinks, routeRequestForStop } from "./filter-data.js?v=42";
 import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=12";
-import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=64";
+import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=65";
 import { addRoutePaths } from "./route-view.js?v=4";
 import { createRequestGate } from "./request-gate.js?v=1";
 import { nearestSchools } from "./school-data.js?v=2";
@@ -143,7 +143,7 @@ function renderMap() {
       };
     })(),
     colorMode: state.apartmentColor,
-    colorOf: value => state.apartmentColor === "commute" ? apartmentColor(state, null, value) : apartmentColor(state, value, null),
+    colorOf: (value, perPyeong) => apartmentColor(state, perPyeong, state.apartmentColor === "commute" ? value : null),
     onSelect: (complex, returnFocus) => commutePlanner?.pickMapPoint(complex, complex.name) || openApartmentDetail(complex, returnFocus),
     category: state.category
   });
