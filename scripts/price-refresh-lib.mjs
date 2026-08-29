@@ -46,12 +46,6 @@ export function eligibleAddressIds(ids, tradeKey, addressesByComplex) {
   return ids.filter(id => !addressesByComplex.has(id) || Boolean(tradeKey && addressesByComplex.get(id).has(tradeKey)));
 }
 
-export function matchedAddressesAreConfigured(matchedAddresses, identities) {
-  if (!Array.isArray(matchedAddresses) || !matchedAddresses.length) return false;
-  const configured = new Set(identities.map(identity => identity.replace("|", " ")));
-  return matchedAddresses.every(address => configured.has(address));
-}
-
 export function xmlValue(item, tag) {
   const match = item.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`));
   return match?.[1]?.trim()

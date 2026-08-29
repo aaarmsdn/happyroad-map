@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { areaKey, areaRange, isCanonicalAreaKey } from "../public/area-data.js";
-import { addressIdentityKey, comparableName, eligibleAddressIds, matchedAddressesAreConfigured, parseTrades, safeParcelRows, summarize, uniqueParcelIdentity, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, comparableName, eligibleAddressIds, parseTrades, safeParcelRows, summarize, uniqueParcelIdentity, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { replaceFiles } from "./replace-files.mjs";
 
 test("paired file replacement restores both originals after a later publish fails", async () => {
@@ -86,11 +86,47 @@ test("parcel-configured complexes require a complete matching trade address", ()
   assert.deepEqual(eligibleAddressIds(["parcel"], "11620|봉천동|2", addresses), []);
 });
 
-test("parcel price evidence requires at least one configured official address", () => {
-  const identities = ["봉천동|1"];
-  assert.equal(matchedAddressesAreConfigured([], identities), false);
-  assert.equal(matchedAddressesAreConfigured(["봉천동 1"], identities), true);
-  assert.equal(matchedAddressesAreConfigured(["봉천동 2"], identities), false);
+test("data validator rejects parcel prices without official address evidence", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-check-address-"));
+  await Promise.all([
+    mkdir(path.join(tempDir, "scripts"), { recursive: true }),
+    mkdir(path.join(tempDir, "config"), { recursive: true }),
+    mkdir(path.join(tempDir, "public", "data"), { recursive: true })
+  ]);
+  const copies = [
+    ["scripts/check-data.mjs", "scripts/check-data.mjs"],
+    ["scripts/price-refresh-lib.mjs", "scripts/price-refresh-lib.mjs"],
+    ["scripts/region-match.mjs", "scripts/region-match.mjs"],
+    ["public/area-data.js", "public/area-data.js"],
+    ["public/filter-data.js", "public/filter-data.js"],
+    ["public/filter-logic.js", "public/filter-logic.js"],
+    ["public/price-data.js", "public/price-data.js"],
+    ["public/ui-utils.js", "public/ui-utils.js"],
+    ["public/data/apartments.json", "public/data/apartments.json"],
+    ["public/data/prices.json", "public/data/prices.json"],
+    ["public/data/schools.json", "public/data/schools.json"],
+    ["config/sgg.json", "config/sgg.json"],
+    ["config/price-snapshot.json", "config/price-snapshot.json"],
+    ["config/price-address-identities.json", "config/price-address-identities.json"]
+  ];
+  await Promise.all(copies.map(([source, target]) => copyFile(fileURLToPath(new URL(`../${source}`, import.meta.url)), path.join(tempDir, target))));
+  const pricePath = path.join(tempDir, "public", "data", "prices.json");
+  const prices = JSON.parse(await readFile(pricePath, "utf8"));
+  const complexId = Object.keys(prices.complexes).find(id => prices.complexes[id].matchMethod === "official_address_and_lawd_cd");
+  prices.complexes[complexId].matchedOfficialAddresses = [];
+  await writeFile(pricePath, JSON.stringify(prices));
+  try {
+    const result = await new Promise(resolve => {
+      const child = spawn(process.execPath, [path.join(tempDir, "scripts", "check-data.mjs")]);
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk; });
+      child.on("close", code => resolve({ code, stderr }));
+    });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /priced records use stale apartment parcel identities/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 });
 
 test("apartment areas keep every whole-square-meter group from 59 through 120", () => {
