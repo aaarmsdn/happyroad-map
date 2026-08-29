@@ -169,7 +169,7 @@ if (addressWorkerUrl) {
     if (identity) {
       const matches = (rowsByRegion.get(complex.regionCode) || []).filter(row => apartmentIdentity(row) === identity);
       const pnu = matches.length ? matches[0].pnu : null;
-      if (pnu && matches.every(row => row.pnu === pnu) && rowsByPnu.get(pnu).length === matches.length) {
+      if (pnu && matches.length === 1 && rowsByPnu.get(pnu).length === 1) {
         complexes[complex.id] = [identity];
         methodByComplex.set(complex.id, "coordinate_parcel");
         if (unresolvedReasons.get(complex.id) === "ambiguous") ambiguous -= 1;

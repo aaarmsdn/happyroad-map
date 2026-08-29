@@ -29,6 +29,9 @@ test("official parcel identities cover safe aggregates and reject shared parcels
   const identities = JSON.parse(await readFile(new URL("../config/price-address-identities.json", import.meta.url), "utf8"));
   assert.equal(identities.complexes["2690"], undefined);
   assert.equal(identities.complexes["483"], undefined);
+  assert.equal(identities.complexes["199"], undefined);
+  assert.equal(identities.complexes["201"], undefined);
+  assert.equal(identities.complexes["219"], undefined);
   assert.deepEqual(identities.complexes["110632"], ["창곡동|563", "창곡동|564", "창곡동|565"]);
   assert.deepEqual(identities.complexes["108064"], ["남가좌동|385"]);
   const values = Object.values(identities.complexes).flat();
