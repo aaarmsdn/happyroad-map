@@ -19,10 +19,11 @@ jobs:
   refresh:
     permissions:
       contents: write
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Refresh official transaction prices
+        shell: bash
         env:
           MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
           MOLIT_MONTHS: "12"
@@ -55,6 +56,7 @@ jobs:
       - name: Validate generated data
         run: npm run check
       - name: Commit changed prices
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
