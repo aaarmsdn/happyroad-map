@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: refresh-apartment-prices
+  cancel-in-progress: true
+
 jobs:
   refresh:
     permissions:
