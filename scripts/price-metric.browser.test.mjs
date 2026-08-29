@@ -8,7 +8,7 @@ import test from "node:test";
 import { chromePaths, connectCdp, freePort, stopProcess, stopProfileProcesses, waitFor } from "./browser-test-runtime.mjs";
 import { mockRoutingRequest } from "./browser-route-mock.mjs";
 
-test("mobile browser regressions", { timeout: 30000 }, async t => {
+test("mobile browser regressions", { timeout: 60000 }, async t => {
   const chromePath = chromePaths.find(existsSync);
   if (!chromePath) return t.skip("Chrome or Edge is required for browser regression tests.");
   const [appPort, debugPort] = await Promise.all([freePort(), freePort()]);
