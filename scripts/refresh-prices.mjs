@@ -1,9 +1,10 @@
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { addressIdentityKey, comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { officialRegionCodeFor, prepareDistricts } from "./region-match.mjs";
+import { replaceFiles } from "./replace-files.mjs";
 import { APARTMENT_AREA_RANGES, areaKey, areaTagsForValues } from "../public/area-data.js";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -310,17 +311,8 @@ apartments.source.areaFilter = "59_to_120_exact_integer_groups";
 apartments.stats.priceStatus = "official_api_refreshed";
 apartments.stats.areaFilter = "59_to_120";
 apartments.stats.areaCounts = Object.fromEntries(APARTMENT_AREA_RANGES.map(([range]) => [range, apartments.complexes.filter(complex => complex.areaTags.includes(range)).length]));
-const apartmentTempPath = `${apartmentPath}.${process.pid}.tmp`;
-const priceTempPath = `${pricePath}.${process.pid}.tmp`;
-try {
-  await Promise.all([
-    writeFile(apartmentTempPath, JSON.stringify(apartments)),
-    writeFile(priceTempPath, JSON.stringify(prices))
-  ]);
-  // ponytail: two files cannot share one rename; publish area metadata before prices. Merge them if pair-level atomicity becomes required.
-  await rename(apartmentTempPath, apartmentPath);
-  await rename(priceTempPath, pricePath);
-} finally {
-  await Promise.all([rm(apartmentTempPath, { force: true }), rm(priceTempPath, { force: true })]);
-}
+await replaceFiles([
+  { path: apartmentPath, contents: JSON.stringify(apartments) },
+  { path: pricePath, contents: JSON.stringify(prices) }
+]);
 console.log(JSON.stringify(prices.refresh, null, 2));

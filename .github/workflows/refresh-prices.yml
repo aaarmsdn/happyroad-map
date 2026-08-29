@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/refresh-prices.mjs"
       - "scripts/price-refresh-lib.mjs"
+      - "scripts/replace-files.mjs"
       - "scripts/region-match.mjs"
       - "public/area-data.js"
       - "config/price-name-aliases.json"

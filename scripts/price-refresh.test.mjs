@@ -7,6 +7,29 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { areaKey, areaRange, isCanonicalAreaKey } from "../public/area-data.js";
 import { addressIdentityKey, comparableName, parseTrades, summarize, uniqueParcelIdentity, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { replaceFiles } from "./replace-files.mjs";
+
+test("paired file replacement restores both originals after a later publish fails", async () => {
+  const contents = new Map([["a", "old-a"], ["b", "old-b"]]);
+  let publishAttempts = 0;
+  const operations = {
+    async writeFile(file, value) { contents.set(file, value); },
+    async rename(from, to) {
+      if (from.endsWith(".tmp") && ++publishAttempts === 2) throw new Error("publish failed");
+      if (!contents.has(from)) throw new Error(`missing ${from}`);
+      contents.set(to, contents.get(from));
+      contents.delete(from);
+    },
+    async rm(file) { contents.delete(file); }
+  };
+  await assert.rejects(replaceFiles([
+    { path: "a", contents: "new-a" },
+    { path: "b", contents: "new-b" }
+  ], operations), /publish failed/);
+  assert.equal(contents.get("a"), "old-a");
+  assert.equal(contents.get("b"), "old-b");
+  assert.equal([...contents.keys()].some(file => file.includes(".tmp") || file.includes(".bak")), false);
+});
 
 test("reviewed aliases cover known official-name variants", async () => {
   const aliases = JSON.parse(await readFile(new URL("../config/price-name-aliases.json", import.meta.url), "utf8"));
@@ -110,6 +133,7 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
   await Promise.all([
     copyFile(fileURLToPath(new URL("../scripts/refresh-prices.mjs", import.meta.url)), path.join(tempDir, "scripts", "refresh-prices.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/price-refresh-lib.mjs", import.meta.url)), path.join(tempDir, "scripts", "price-refresh-lib.mjs")),
+    copyFile(fileURLToPath(new URL("../scripts/replace-files.mjs", import.meta.url)), path.join(tempDir, "scripts", "replace-files.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/region-match.mjs", import.meta.url)), path.join(tempDir, "scripts", "region-match.mjs")),
     copyFile(fileURLToPath(new URL("../public/area-data.js", import.meta.url)), path.join(tempDir, "public", "area-data.js")),
     copyFile(fileURLToPath(new URL("../config/sgg.json", import.meta.url)), path.join(tempDir, "config", "sgg.json"))
