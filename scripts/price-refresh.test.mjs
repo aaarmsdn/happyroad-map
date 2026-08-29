@@ -31,6 +31,8 @@ test("official parcel identities cover safe aggregates and reject shared parcels
   assert.equal(identities.complexes["483"], undefined);
   assert.deepEqual(identities.complexes["110632"], ["창곡동|563", "창곡동|564", "창곡동|565"]);
   assert.deepEqual(identities.complexes["108064"], ["남가좌동|385"]);
+  const values = Object.values(identities.complexes).flat();
+  assert.equal(new Set(values).size, values.length);
   assert.equal(addressIdentityKey("11680", " 개포동 ", "0012-000"), "11680|개포동|12-0");
 });
 

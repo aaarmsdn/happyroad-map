@@ -8,9 +8,15 @@ const sourceUrl = "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FIL
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 if (process.argv.includes("--help")) {
-  console.log("Usage: node scripts/refresh-apartment-identities.mjs [official-identity.csv]");
+  console.log("Usage: node scripts/refresh-apartment-identities.mjs [official-identity.csv] [--address-worker URL]");
   process.exit(0);
 }
+
+const args = process.argv.slice(2);
+const workerIndex = args.indexOf("--address-worker");
+const addressWorkerUrl = workerIndex >= 0 ? args[workerIndex + 1] : null;
+if (workerIndex >= 0) args.splice(workerIndex, 2);
+if (args.length > 1 || (workerIndex >= 0 && !addressWorkerUrl)) throw new Error("Invalid apartment identity arguments.");
 
 function parseCsvLine(line) {
   const values = [];
@@ -44,7 +50,21 @@ function closeHouseholdCount(actual, expected) {
   return actual > 0 && expected > 0 && Math.abs(actual - expected) <= Math.max(10, Math.round(expected * 0.02));
 }
 
-const inputPath = process.argv[2];
+async function reverseParcelIdentity(worker, complex) {
+  worker.pathname = "/address";
+  worker.search = new URLSearchParams({ lat: complex.lat, lng: complex.lng });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(worker, { headers: { origin: "https://aaarmsdn.github.io" }, signal: AbortSignal.timeout(10000) });
+      if (response.ok) return String((await response.json()).parcelIdentity || "");
+      if (response.status !== 429 && response.status < 500) return "";
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  return "";
+}
+
+const inputPath = args[0];
 const csv = inputPath
   ? await readFile(path.resolve(inputPath), "utf8")
   : await fetch(sourceUrl).then(response => {
@@ -81,9 +101,10 @@ const [apartments, aliases] = await Promise.all([
   readFile(path.join(projectDir, "config", "price-name-aliases.json"), "utf8").then(JSON.parse)
 ]);
 const complexes = {};
-const methods = {};
+const methodByComplex = new Map();
 let ambiguous = 0;
 let noCandidate = 0;
+const unresolvedReasons = new Map();
 for (const complex of apartments.complexes) {
   const rows = rowsByRegion.get(complex.regionCode) || [];
   const baseName = normalizeName(complex.name);
@@ -131,13 +152,54 @@ for (const complex of apartments.complexes) {
   }))].sort((left, right) => left.localeCompare(right, "ko"));
   if (identities.length) {
     complexes[complex.id] = identities;
-    methods[method] = (methods[method] || 0) + 1;
+    methodByComplex.set(complex.id, method);
   } else if (chosen.length) {
     ambiguous += 1;
+    unresolvedReasons.set(complex.id, "ambiguous");
   } else {
     noCandidate += 1;
+    unresolvedReasons.set(complex.id, "noCandidate");
   }
 }
+
+if (addressWorkerUrl) {
+  const worker = new URL(addressWorkerUrl);
+  for (const complex of apartments.complexes.filter(item => !complexes[item.id] && !(aliases[item.id] || []).length)) {
+    const identity = await reverseParcelIdentity(worker, complex);
+    if (identity) {
+      const matches = (rowsByRegion.get(complex.regionCode) || []).filter(row => apartmentIdentity(row) === identity);
+      const pnu = matches.length ? matches[0].pnu : null;
+      if (pnu && matches.every(row => row.pnu === pnu) && rowsByPnu.get(pnu).length === matches.length) {
+        complexes[complex.id] = [identity];
+        methodByComplex.set(complex.id, "coordinate_parcel");
+        if (unresolvedReasons.get(complex.id) === "ambiguous") ambiguous -= 1;
+        else noCandidate -= 1;
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+}
+
+const ownersByIdentity = new Map();
+for (const [complexId, identities] of Object.entries(complexes)) {
+  for (const identity of identities) {
+    if (!ownersByIdentity.has(identity)) ownersByIdentity.set(identity, []);
+    ownersByIdentity.get(identity).push(complexId);
+  }
+}
+const duplicateIdentities = new Set([...ownersByIdentity].filter(([, owners]) => owners.length > 1).map(([identity]) => identity));
+for (const [complexId, identities] of Object.entries(complexes)) {
+  const uniqueIdentities = identities.filter(identity => !duplicateIdentities.has(identity));
+  if (uniqueIdentities.length) complexes[complexId] = uniqueIdentities;
+  else delete complexes[complexId];
+}
+const methods = {};
+for (const complexId of Object.keys(complexes)) {
+  const method = methodByComplex.get(complexId);
+  methods[method] = (methods[method] || 0) + 1;
+}
+ambiguous = apartments.complexes.filter(complex => !complexes[complex.id] && unresolvedReasons.get(complex.id) === "ambiguous").length;
+noCandidate = apartments.complexes.length - Object.keys(complexes).length - ambiguous;
 
 const output = {
   schemaVersion: 1,
@@ -147,7 +209,7 @@ const output = {
     url: sourceUrl,
     sha256: createHash("sha256").update(csv).digest("hex")
   },
-  stats: { matchedComplexes: Object.keys(complexes).length, ambiguous, noCandidate, methods },
+  stats: { matchedComplexes: Object.keys(complexes).length, ambiguous, noCandidate, duplicateIdentities: duplicateIdentities.size, methods },
   complexes
 };
 await writeFile(path.join(projectDir, "config", "price-address-identities.json"), JSON.stringify(output));

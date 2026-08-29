@@ -139,10 +139,13 @@ test("worker returns a compact road address for a map coordinate", async () => {
   let upstream;
   const response = await handleRequest(new Request("https://worker.test/address?lat=37.5446&lng=127.056", { headers: { origin: env.ALLOWED_ORIGIN } }), env, async url => {
     upstream = String(url);
-    return Response.json({ documents: [{ road_address: { region_1depth_name: "서울", region_2depth_name: "성동구", road_name: "성수일로", main_building_no: "12", sub_building_no: "3" } }] });
+    return Response.json({ documents: [{
+      address: { region_3depth_name: "성수동1가", main_address_no: "676", sub_address_no: "5", mountain_yn: "N" },
+      road_address: { region_1depth_name: "서울", region_2depth_name: "성동구", road_name: "성수일로", main_building_no: "12", sub_building_no: "3" }
+    }] });
   });
   assert.match(upstream, /\/v2\/local\/geo\/coord2address\.json/);
-  assert.deepEqual(await response.json(), { address: "서울 성동구 성수일로 12-3" });
+  assert.deepEqual(await response.json(), { address: "서울 성동구 성수일로 12-3", parcelIdentity: "성수동1가|676-5" });
 });
 
 test("transit geometry may omit a one-kilometer connector while walk geometry stays strict", () => {

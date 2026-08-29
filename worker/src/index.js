@@ -161,10 +161,17 @@ export async function handleRequest(request, env, fetcher = fetch) {
       upstream.searchParams.set("y", point.lat);
       const document = (await kakao(upstream, env, fetcher))?.documents?.[0];
       const road = document?.road_address;
+      const parcel = document?.address;
       const buildingNo = [road?.main_building_no, road?.sub_building_no].filter(value => value && value !== "0").join("-");
       const address = [road?.region_1depth_name, road?.region_2depth_name, road?.road_name, buildingNo]
         .map(value => String(value || "").replace(/\s+/g, " ").trim()).filter(Boolean).join(" ").slice(0, 100);
-      return address ? json({ address }, 200, origin) : json({ error: "address_not_found" }, 404, origin);
+      const lot = [parcel?.main_address_no, parcel?.sub_address_no].filter(value => value && value !== "0").join("-");
+      const parcelIdentity = parcel?.region_3depth_name && lot
+        ? `${parcel.region_3depth_name}|${parcel.mountain_yn === "Y" ? "산" : ""}${lot}`
+        : null;
+      return address || parcelIdentity
+        ? json({ ...(address ? { address } : {}), ...(parcelIdentity ? { parcelIdentity } : {}) }, 200, origin)
+        : json({ error: "address_not_found" }, 404, origin);
     }
     if (request.method === "POST" && url.pathname === "/routes") {
       const body = await routeBody(request, 8192);
