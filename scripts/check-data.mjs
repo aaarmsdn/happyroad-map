@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { areaRange, isCanonicalAreaKey } from "../public/area-data.js";
 import { priceRecordForDisplay } from "../public/filter-data.js";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
-import { addressIdentityKey } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, matchedAddressesAreConfigured } from "./price-refresh-lib.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(projectDir, "public", "data");
@@ -48,8 +48,7 @@ const staleAddressPrices = Object.entries(prices.complexes).filter(([complexId, 
   const identities = addressIdentities.complexes?.[complexId] || [];
   if (!identities.length) return false;
   if (record.matchMethod !== "official_address_and_lawd_cd") return true;
-  const configuredAddresses = new Set(identities.map(identity => identity.replace("|", " ")));
-  return (record.matchedOfficialAddresses || []).some(address => !configuredAddresses.has(address));
+  return !matchedAddressesAreConfigured(record.matchedOfficialAddresses, identities);
 });
 if (staleAddressPrices.length) throw new Error(`${staleAddressPrices.length} priced records use stale apartment parcel identities`);
 const hiddenPrices = Object.entries(prices.complexes).filter(([complexId, record]) =>

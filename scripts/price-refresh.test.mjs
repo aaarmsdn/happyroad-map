@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { areaKey, areaRange, isCanonicalAreaKey } from "../public/area-data.js";
-import { addressIdentityKey, comparableName, eligibleAddressIds, parseTrades, safeParcelRows, summarize, uniqueParcelIdentity, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, comparableName, eligibleAddressIds, matchedAddressesAreConfigured, parseTrades, safeParcelRows, summarize, uniqueParcelIdentity, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { replaceFiles } from "./replace-files.mjs";
 
 test("paired file replacement restores both originals after a later publish fails", async () => {
@@ -84,6 +84,13 @@ test("parcel-configured complexes require a complete matching trade address", ()
   assert.deepEqual(eligibleAddressIds(["parcel", "name-only"], null, addresses), ["name-only"]);
   assert.deepEqual(eligibleAddressIds(["parcel"], "11620|봉천동|1", addresses), ["parcel"]);
   assert.deepEqual(eligibleAddressIds(["parcel"], "11620|봉천동|2", addresses), []);
+});
+
+test("parcel price evidence requires at least one configured official address", () => {
+  const identities = ["봉천동|1"];
+  assert.equal(matchedAddressesAreConfigured([], identities), false);
+  assert.equal(matchedAddressesAreConfigured(["봉천동 1"], identities), true);
+  assert.equal(matchedAddressesAreConfigured(["봉천동 2"], identities), false);
 });
 
 test("apartment areas keep every whole-square-meter group from 59 through 120", () => {
