@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { addressIdentityKey, normalizeName, uniqueParcelIdentity } from "./price-refresh-lib.mjs";
@@ -225,8 +225,19 @@ const output = {
   stats: { matchedComplexes: Object.keys(complexes).length, ambiguous, noCandidate, duplicateIdentities: duplicateIdentities.size, methods },
   complexes
 };
-await Promise.all([
-  writeFile(path.join(projectDir, "config", "price-address-identities.json"), JSON.stringify(output)),
-  writeFile(path.join(projectDir, "public", "data", "apartments.json"), JSON.stringify(apartments))
-]);
+const identityPath = path.join(projectDir, "config", "price-address-identities.json");
+const apartmentPath = path.join(projectDir, "public", "data", "apartments.json");
+const identityTempPath = `${identityPath}.${process.pid}.tmp`;
+const apartmentTempPath = `${apartmentPath}.${process.pid}.tmp`;
+try {
+  await Promise.all([
+    writeFile(identityTempPath, JSON.stringify(output)),
+    writeFile(apartmentTempPath, JSON.stringify(apartments))
+  ]);
+  // ponytail: publish apartment region metadata before identities so prices never consume identities with stale regions.
+  await rename(apartmentTempPath, apartmentPath);
+  await rename(identityTempPath, identityPath);
+} finally {
+  await Promise.all([rm(identityTempPath, { force: true }), rm(apartmentTempPath, { force: true })]);
+}
 console.log(JSON.stringify(output.stats, null, 2));
