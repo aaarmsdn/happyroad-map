@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { areaRange } from "../public/area-data.js";
+import { areaRange, isCanonicalAreaKey } from "../public/area-data.js";
 import { priceRecordForDisplay } from "../public/filter-data.js";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
 
@@ -40,7 +40,7 @@ if (snapshotRecords.some(record => record.source !== snapshotProvenance.source))
 const missingAreaTags = Object.entries(prices.complexes).flatMap(([complexId, record]) => Object.entries(record.areas || {})
   .filter(([band, area]) => {
     const tags = complexById.get(complexId)?.areaTags || [];
-    return Number(area?.median) > 0 && !tags.includes(areaRange(band));
+    return Number(area?.median) > 0 && (!isCanonicalAreaKey(band) || !tags.includes(areaRange(band)));
   })
   .map(([area]) => `${complexId}:${area}`));
 if (missingAreaTags.length) throw new Error(`${missingAreaTags.length} priced apartment areas are missing filter tags`);

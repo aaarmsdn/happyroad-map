@@ -247,12 +247,6 @@ test("apartment settings expose six contiguous area ranges", async () => {
   assert.doesNotMatch(html, /data-area="(?:59|84|102|115)"/);
 });
 
-test("snapshot imports preserve every observed 59-to-120 area key", async () => {
-  const source = await read("scripts/import-price-snapshot.mjs");
-  assert.match(source, /areaKeysForSelection\(source\.areas\)/);
-  assert.doesNotMatch(source, /const bands = \["59", "84", "102", "115"\]/);
-});
-
 test("apartment settings expose price, commute, and plain color modes", async () => {
   const html = await read("public/index.html");
   assert.match(html, /data-apartment-color="price"[^>]*>평당가/);

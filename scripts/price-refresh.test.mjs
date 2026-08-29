@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { areaKey, areaRange } from "../public/area-data.js";
+import { areaKey, areaRange, isCanonicalAreaKey } from "../public/area-data.js";
 import { comparableName, parseTrades, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
 
 test("reviewed aliases cover known official-name variants", async () => {
@@ -35,6 +35,8 @@ test("apartment areas keep every whole-square-meter group from 59 through 120", 
   assert.equal(areaRange(76), "70-79");
   assert.equal(areaRange(84), "80-89");
   assert.equal(areaRange(120), "110-120");
+  assert.equal(isCanonicalAreaKey("84"), true);
+  for (const key of ["84e0", "0x54", " 84 ", "58", "121"]) assert.equal(isCanonicalAreaKey(key), false);
 });
 
 test("MOLIT parser preserves official address identity fields", () => {

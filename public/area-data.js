@@ -17,9 +17,13 @@ export function areaRange(value) {
   return APARTMENT_AREA_RANGES.find(([, min, max]) => area >= min && area <= max)?.[0] ?? null;
 }
 
+export function isCanonicalAreaKey(value) {
+  return /^\d{2,3}$/.test(value) && areaKey(value) === value;
+}
+
 export function areaKeysForSelection(areas, selection = "전체") {
   return Object.keys(areas || {}).filter(key => {
-    if (!/^\d{2,3}$/.test(key) || Number(areas[key]?.count) <= 0 || !areaRange(key)) return false;
+    if (!isCanonicalAreaKey(key) || Number(areas[key]?.count) <= 0) return false;
     return selection === "전체" || areaRange(key) === selection || key === selection;
   }).sort((a, b) => Number(a) - Number(b));
 }

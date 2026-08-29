@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -7,6 +8,63 @@ import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { apartmentDetailHtml, stopDetailHtml } from "../public/detail-view.js";
 import { formatDate, safeExternalUrl } from "../public/ui-utils.js";
+
+test("snapshot importer preserves every observed 59-to-120 area key", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-snapshot-area-"));
+  const sourcePath = path.join(tempDir, "snapshot.js");
+  const generatedAt = "2026-08-29T00:00:00.000Z";
+  const sourceText = `window.HAPPYROAD_ACTUAL_PRICE_DATA=${JSON.stringify({
+    generatedAt,
+    priceByComplex: {
+      "1": {
+        matchStatus: "matched",
+        matchedTradeCount: 2,
+        latestTradeDate: "20260828",
+        areas: {
+          "58": { count: 1, max: 58000 },
+          "76": { count: 1, max: 76000 },
+          "118": { count: 1, max: 118000 },
+          "121": { count: 1, max: 121000 }
+        }
+      }
+    }
+  })};`;
+  await Promise.all([
+    mkdir(path.join(tempDir, "scripts"), { recursive: true }),
+    mkdir(path.join(tempDir, "config"), { recursive: true }),
+    mkdir(path.join(tempDir, "public", "data"), { recursive: true })
+  ]);
+  await Promise.all([
+    copyFile(fileURLToPath(new URL("../scripts/import-price-snapshot.mjs", import.meta.url)), path.join(tempDir, "scripts", "import-price-snapshot.mjs")),
+    copyFile(fileURLToPath(new URL("../public/area-data.js", import.meta.url)), path.join(tempDir, "public", "area-data.js")),
+    writeFile(sourcePath, sourceText),
+    writeFile(path.join(tempDir, "config", "price-snapshot.json"), JSON.stringify({
+      generatedAt,
+      source: "official test snapshot",
+      sha256: createHash("sha256").update(sourceText).digest("hex")
+    })),
+    writeFile(path.join(tempDir, "public", "data", "apartments.json"), JSON.stringify({
+      complexes: [{ id: "1", regionCode: "11110", areaTags: [] }], source: {}, stats: {}
+    })),
+    writeFile(path.join(tempDir, "public", "data", "prices.json"), JSON.stringify({ complexes: {} }))
+  ]);
+
+  try {
+    const result = await new Promise(resolve => {
+      const child = spawn(process.execPath, [path.join(tempDir, "scripts", "import-price-snapshot.mjs"), sourcePath]);
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk; });
+      child.on("close", code => resolve({ code, stderr }));
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const apartments = JSON.parse(await readFile(path.join(tempDir, "public", "data", "apartments.json"), "utf8"));
+    const prices = JSON.parse(await readFile(path.join(tempDir, "public", "data", "prices.json"), "utf8"));
+    assert.deepEqual(apartments.complexes[0].areaTags, ["70-79", "110-120"]);
+    assert.deepEqual(Object.keys(prices.complexes["1"].areas), ["76", "118"]);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
 
 test("untrusted dates and external URLs cannot become executable HTML", () => {
   assert.equal(formatDate('<img src=x onerror="alert(1)">'), "날짜 없음");
