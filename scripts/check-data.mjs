@@ -46,7 +46,7 @@ if (new Set(addressIdentityValues).size !== addressIdentityValues.length) throw 
 const staleAddressPrices = Object.entries(prices.complexes).filter(([complexId, record]) => {
   if (record.matchStatus !== "matched") return false;
   const identities = addressIdentities.complexes?.[complexId] || [];
-  if (!identities.length) return false;
+  if (!identities.length) return record.matchMethod === "official_address_and_lawd_cd";
   if (record.matchMethod !== "official_address_and_lawd_cd") return true;
   if (!Array.isArray(record.matchedOfficialAddresses) || !record.matchedOfficialAddresses.length) return true;
   const configuredAddresses = new Set(identities.map(identity => identity.replace("|", " ")));

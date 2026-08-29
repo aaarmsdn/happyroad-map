@@ -11,6 +11,7 @@ on:
       - "public/area-data.js"
       - "config/price-name-aliases.json"
       - "config/price-address-identities.json"
+      - "config/sgg.json"
       - ".github/workflows/refresh-prices.yml"
   schedule:
     - cron: "17 19 * * *"

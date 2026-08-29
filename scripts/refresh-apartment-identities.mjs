@@ -230,6 +230,11 @@ for (const complexId of Object.keys(complexes)) {
 }
 ambiguous = apartments.complexes.filter(complex => !complexes[complex.id] && unresolvedReasons.get(complex.id) === "ambiguous").length;
 noCandidate = apartments.complexes.length - Object.keys(complexes).length - ambiguous;
+const previousMatched = Object.keys(previousIdentities.complexes || {}).length;
+const matched = Object.keys(complexes).length;
+if (previousMatched && matched < Math.ceil(previousMatched * 0.9)) {
+  throw new Error(`Apartment identity coverage fell from ${previousMatched} to ${matched}; identity data was not replaced.`);
+}
 
 const output = {
   schemaVersion: 1,
@@ -239,7 +244,7 @@ const output = {
     url: sourceUrl,
     sha256: createHash("sha256").update(csv).digest("hex")
   },
-  stats: { matchedComplexes: Object.keys(complexes).length, ambiguous, noCandidate, duplicateIdentities: duplicateIdentities.size, methods },
+  stats: { matchedComplexes: matched, ambiguous, noCandidate, duplicateIdentities: duplicateIdentities.size, methods },
   complexes
 };
 const identityPath = path.join(projectDir, "config", "price-address-identities.json");

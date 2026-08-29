@@ -86,7 +86,7 @@ test("parcel-configured complexes require a complete matching trade address", ()
   assert.deepEqual(eligibleAddressIds(["parcel"], "11620|봉천동|2", addresses), []);
 });
 
-test("data validator rejects parcel prices without official address evidence", async () => {
+test("data validator rejects missing or stale official address evidence", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-check-address-"));
   await Promise.all([
     mkdir(path.join(tempDir, "scripts"), { recursive: true }),
@@ -113,6 +113,7 @@ test("data validator rejects parcel prices without official address evidence", a
   const pricePath = path.join(tempDir, "public", "data", "prices.json");
   const prices = JSON.parse(await readFile(pricePath, "utf8"));
   const complexId = Object.keys(prices.complexes).find(id => prices.complexes[id].matchMethod === "official_address_and_lawd_cd");
+  const matchedOfficialAddresses = prices.complexes[complexId].matchedOfficialAddresses;
   prices.complexes[complexId].matchedOfficialAddresses = [];
   await writeFile(pricePath, JSON.stringify(prices));
   try {
@@ -124,6 +125,68 @@ test("data validator rejects parcel prices without official address evidence", a
     });
     assert.notEqual(result.code, 0);
     assert.match(result.stderr, /priced records use stale apartment parcel identities/);
+    prices.complexes[complexId].matchedOfficialAddresses = matchedOfficialAddresses;
+    await writeFile(pricePath, JSON.stringify(prices));
+    const identityPath = path.join(tempDir, "config", "price-address-identities.json");
+    const identities = JSON.parse(await readFile(identityPath, "utf8"));
+    delete identities.complexes[complexId];
+    await writeFile(identityPath, JSON.stringify(identities));
+    const staleResult = await new Promise(resolve => {
+      const child = spawn(process.execPath, [path.join(tempDir, "scripts", "check-data.mjs")]);
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk; });
+      child.on("close", code => resolve({ code, stderr }));
+    });
+    assert.notEqual(staleResult.code, 0);
+    assert.match(staleResult.stderr, /priced records use stale apartment parcel identities/);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("identity refresh rejects a sparse official CSV without replacing the ledger", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-identities-"));
+  await Promise.all([
+    mkdir(path.join(tempDir, "scripts"), { recursive: true }),
+    mkdir(path.join(tempDir, "config"), { recursive: true }),
+    mkdir(path.join(tempDir, "public", "data"), { recursive: true })
+  ]);
+  await Promise.all([
+    "refresh-apartment-identities.mjs",
+    "price-refresh-lib.mjs",
+    "replace-files.mjs"
+  ].map(file => copyFile(fileURLToPath(new URL(file, import.meta.url)), path.join(tempDir, "scripts", file))));
+  const complexes = Array.from({ length: 20 }, (_, index) => ({
+    id: String(index + 1),
+    name: `테스트${index + 1}`,
+    regionCode: "11680",
+    households: 100,
+    completed: "2020-01-01",
+    lat: 37.5,
+    lng: 127
+  }));
+  const previous = Object.fromEntries(complexes.map(complex => [complex.id, [`테스트동|${complex.id}`]]));
+  await Promise.all([
+    writeFile(path.join(tempDir, "public", "data", "apartments.json"), JSON.stringify({ complexes })),
+    writeFile(path.join(tempDir, "config", "price-name-aliases.json"), "{}"),
+    writeFile(path.join(tempDir, "config", "price-address-identities.json"), JSON.stringify({ complexes: previous }))
+  ]);
+  const csvPath = path.join(tempDir, "official.csv");
+  await writeFile(csvPath, [
+    "단지고유번호,필지고유번호,법정동주소,단지명1,단지명2,단지명3,단지구분,도로명주소,세대수,사용승인일",
+    "1,1168010300100010000,서울특별시 강남구 테스트동 1,테스트1,,,1,,100,20200101"
+  ].join("\n"));
+  try {
+    const result = await new Promise(resolve => {
+      const child = spawn(process.execPath, [path.join(tempDir, "scripts", "refresh-apartment-identities.mjs"), csvPath]);
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk; });
+      child.on("close", code => resolve({ code, stderr }));
+    });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /identity coverage fell from 20 to 0/);
+    const preserved = JSON.parse(await readFile(path.join(tempDir, "config", "price-address-identities.json"), "utf8"));
+    assert.deepEqual(preserved.complexes, previous);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
