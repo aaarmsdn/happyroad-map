@@ -40,7 +40,7 @@ if (snapshotRecords.some(record => record.source !== snapshotProvenance.source))
 const missingAreaTags = Object.entries(prices.complexes).flatMap(([complexId, record]) => Object.entries(record.areas || {})
   .filter(([band, area]) => {
     const tags = complexById.get(complexId)?.areaTags || [];
-    return !isCanonicalAreaKey(band) || (Number(area?.median) > 0 && !tags.includes(areaRange(band)));
+    return !isCanonicalAreaKey(band) || (record.matchStatus === "matched" && !tags.includes(areaRange(band)));
   })
   .map(([area]) => `${complexId}:${area}`));
 if (missingAreaTags.length) throw new Error(`${missingAreaTags.length} priced apartment areas are missing filter tags`);

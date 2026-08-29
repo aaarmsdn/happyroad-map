@@ -1,5 +1,5 @@
 import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
-import { priceMetric, representativeAreaPrice, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=40";
+import { priceMetric, representativeAreaPrice, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=41";
 import { areaKeysForSelection } from "./area-data.js?v=1";
 
 export function stopDetailHtml(stop) {
@@ -58,6 +58,7 @@ function timeMinutes(value) {
 const priceMetricLabels = { max: "최고값", average: "평균값", min: "최저값" };
 
 function areaMetrics(record, selectedArea, selectedMetric) {
+  if (!selectedArea) return `<p class="empty-note">전용면적을 선택하지 않아 아파트가 숨겨졌습니다.</p>`;
   const metric = priceMetric(selectedMetric);
   const available = areaKeysForSelection(record?.areas, selectedArea);
   const representative = representativeAreaPrice(record, metric, selectedArea);
@@ -115,6 +116,7 @@ export function schoolDetailHtml(school, source = {}) {
 export function apartmentDetailHtml({ complex, relatedLinks, commute, includeWalking = true, record, selectedArea, priceMetric: selectedMetric = "max", schools = {}, schoolSource = {} }) {
   const metric = priceMetric(selectedMetric);
   const roundTrip = Number.isFinite(commute?.roundTripMinutes) ? `${commute.roundTripMinutes}분` : "-";
+  const priceSource = record ? `국토교통부 API · 최근 거래일 ${formatDate(record.latestTradeDate)}` : "국토교통부 API 매칭 정보 없음";
   return `
     <h2>${escapeHtml(complex.name).replace("(", "<wbr>(")}</h2>
     <p class="detail-meta">${escapeHtml(complex.type || "아파트")} · ${escapeHtml(complex.households.toLocaleString("ko-KR"))}세대 · ${complex.completed ? `${escapeHtml(complex.completed.slice(0, 4))}년 준공` : "준공일 정보 없음"}</p>
@@ -124,7 +126,7 @@ export function apartmentDetailHtml({ complex, relatedLinks, commute, includeWal
       <div class="metric"><span>왕복</span><b>${roundTrip}</b><small>${includeWalking ? "도보 포함" : "도보 제외"}</small></div>
     </div>
     <h3 class="detail-subtitle">최근 실거래 · ${priceMetricLabels[metric]}</h3>
-    <p class="source-note">${record?.matchStatus === "snapshot" ? "국토교통부 공개자료 스냅샷" : "국토교통부 API"} · 최근 거래일 ${formatDate(record?.latestTradeDate)}</p>
+    <p class="source-note">${priceSource}</p>
     ${areaMetrics(record, selectedArea, metric)}
     <div class="route-list">
       ${relatedLinks.slice(0, 5).map(link => {

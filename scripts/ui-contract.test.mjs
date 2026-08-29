@@ -161,6 +161,16 @@ test("apartment details show only the available stop direction", () => {
   assert.doesNotMatch(html, /출퇴근|출근 -|퇴근 -|노선 없음/);
 });
 
+test("empty area selection explains that apartment markers are hidden", () => {
+  const html = apartmentDetailHtml({
+    complex: { name: "단지", type: "아파트", households: 100, completed: "2000", externalUrl: "" },
+    relatedLinks: [], record: null, selectedArea: ""
+  });
+  assert.match(html, /전용면적을 선택하지 않아 아파트가 숨겨졌습니다/);
+  assert.match(html, /국토교통부 API 매칭 정보 없음/);
+  assert.doesNotMatch(html, />㎡ 최근 실거래가가 없습니다/);
+});
+
 test("all-area apartment details expose the same target-area maximum as the marker", () => {
   const record = {
     matchStatus: "matched", matchMethod: "unique_containment_name_and_lawd_cd_from_boundary", matchRegionCode: "41135",
