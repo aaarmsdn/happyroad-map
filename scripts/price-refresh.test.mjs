@@ -127,6 +127,32 @@ test("data validator rejects missing or stale official address evidence", async 
     assert.match(result.stderr, /priced records use stale apartment parcel identities/);
     prices.complexes[complexId].matchedOfficialAddresses = matchedOfficialAddresses;
     await writeFile(pricePath, JSON.stringify(prices));
+    const acceptedAddressYears = prices.complexes[complexId].matchedBuildYears;
+    prices.complexes[complexId].matchedBuildYears = [];
+    await writeFile(pricePath, JSON.stringify(prices));
+    const addressBackedResult = await new Promise(resolve => {
+      const child = spawn(process.execPath, [path.join(tempDir, "scripts", "check-data.mjs")]);
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk; });
+      child.on("close", code => resolve({ code, stderr }));
+    });
+    assert.equal(addressBackedResult.code, 0, addressBackedResult.stderr);
+    prices.complexes[complexId].matchedBuildYears = acceptedAddressYears;
+    const nameComplexId = Object.keys(prices.complexes).find(id => prices.complexes[id].matchStatus === "matched"
+      && prices.complexes[id].matchMethod !== "official_address_and_lawd_cd");
+    const acceptedNameYears = prices.complexes[nameComplexId].matchedBuildYears;
+    prices.complexes[nameComplexId].matchedBuildYears = [];
+    await writeFile(pricePath, JSON.stringify(prices));
+    const missingYearResult = await new Promise(resolve => {
+      const child = spawn(process.execPath, [path.join(tempDir, "scripts", "check-data.mjs")]);
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk; });
+      child.on("close", code => resolve({ code, stderr }));
+    });
+    assert.notEqual(missingYearResult.code, 0);
+    assert.match(missingYearResult.stderr, /name-matched apartment prices have incompatible build years/);
+    prices.complexes[nameComplexId].matchedBuildYears = acceptedNameYears;
+    await writeFile(pricePath, JSON.stringify(prices));
     const identityPath = path.join(tempDir, "config", "price-address-identities.json");
     const identities = JSON.parse(await readFile(identityPath, "utf8"));
     delete identities.complexes[complexId];
@@ -352,7 +378,7 @@ globalThis.fetch = async url => {
   requests += 1;
   if (requests === 1) throw new TypeError("temporary network failure");
   months.push(new URL(url).searchParams.get("DEAL_YMD"));
-  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>14</totalCount><items><item><aptNm>자양우성7</aptNm><umdNm>자양동</umdNm><jibun>100</jibun><buildYear>1995</buildYear><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양우성7</aptNm><umdNm>구의동</umdNm><jibun>999</jibun><buildYear>1995</buildYear><excluUseAr>110.47</excluUseAr><dealAmount>999,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><buildYear>2006</buildYear><excluUseAr>113</excluUseAr><dealAmount>180,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>한강자이(고층)</aptNm><buildYear>2006</buildYear><excluUseAr>113</excluUseAr><dealAmount>181,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>테스트파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>88,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>서울테스트파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>광진테스트파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>95,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>4</dealDay></item><item><aptNm>서울샘플파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>70,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>5</dealDay></item><item><aptNm>광진샘플파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>75,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>6</dealDay></item><item><aptNm>공식별칭파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>80,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>7</dealDay></item><item><aptNm>서울별칭파크</aptNm><umdNm>자양동</umdNm><jibun>200</jibun><roadNm>한강로</roadNm><roadNmBonbun>20</roadNmBonbun><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>82,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>8</dealDay></item><item><aptNm>두산위브</aptNm><umdNm>증산동</umdNm><jibun>255</jibun><buildYear>2005</buildYear><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>9</dealDay></item><item><aptNm>새절역두산위브트레지움</aptNm><umdNm>증산동</umdNm><jibun>999</jibun><excluUseAr>84</excluUseAr><dealAmount>101,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>10</dealDay></item></items></body></response>\`, { status: 200 });
+  return new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>14</totalCount><items><item><aptNm>자양우성7</aptNm><umdNm>자양동</umdNm><jibun>100</jibun><excluUseAr>110.47</excluUseAr><dealAmount>165,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양우성7</aptNm><umdNm>구의동</umdNm><jibun>999</jibun><buildYear>1995</buildYear><excluUseAr>110.47</excluUseAr><dealAmount>999,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>자양현대7</aptNm><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>한강자이</aptNm><buildYear>2006</buildYear><excluUseAr>113</excluUseAr><dealAmount>180,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>한강자이(고층)</aptNm><buildYear>2006</buildYear><excluUseAr>113</excluUseAr><dealAmount>181,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>테스트파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>88,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item><item><aptNm>서울테스트파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>90,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>3</dealDay></item><item><aptNm>광진테스트파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>95,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>4</dealDay></item><item><aptNm>서울샘플파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>70,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>5</dealDay></item><item><aptNm>광진샘플파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>75,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>6</dealDay></item><item><aptNm>공식별칭파크</aptNm><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>80,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>7</dealDay></item><item><aptNm>서울별칭파크</aptNm><umdNm>자양동</umdNm><jibun>200</jibun><roadNm>한강로</roadNm><roadNmBonbun>20</roadNmBonbun><buildYear>2001</buildYear><excluUseAr>84</excluUseAr><dealAmount>82,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>8</dealDay></item><item><aptNm>두산위브</aptNm><umdNm>증산동</umdNm><jibun>255</jibun><buildYear>2005</buildYear><excluUseAr>84</excluUseAr><dealAmount>100,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>9</dealDay></item><item><aptNm>새절역두산위브트레지움</aptNm><umdNm>증산동</umdNm><jibun>999</jibun><excluUseAr>84</excluUseAr><dealAmount>101,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>10</dealDay></item></items></body></response>\`, { status: 200 });
 };
 process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQUESTS=\${requests}\`));`);
 
@@ -394,7 +420,7 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
     assert.deepEqual(prices.complexes["104"].matchedOfficialNames, ["공식별칭파크"]);
     assert.equal(prices.complexes["105"], undefined);
     assert.deepEqual(prices.complexes["97"].matchedOfficialAddresses, ["자양동 100"]);
-    assert.deepEqual(prices.complexes["97"].matchedBuildYears, [1995]);
+    assert.deepEqual(prices.complexes["97"].matchedBuildYears, []);
     assert.equal(prices.refresh.matchedByUniqueContainment, 24);
     assert.equal(prices.refresh.skippedAddressMismatch, 12);
     assert.equal(prices.refresh.skippedBuildYearMismatch, 24);
