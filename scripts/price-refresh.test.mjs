@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { areaKey, areaRange, isCanonicalAreaKey } from "../public/area-data.js";
-import { addressIdentityKey, comparableName, parseTrades, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, comparableName, parseTrades, summarize, uniqueParcelIdentity, unmatchedNameReason } from "./price-refresh-lib.mjs";
 
 test("reviewed aliases cover known official-name variants", async () => {
   const aliases = JSON.parse(await readFile(new URL("../config/price-name-aliases.json", import.meta.url), "utf8"));
@@ -34,9 +34,17 @@ test("official parcel identities cover safe aggregates and reject shared parcels
   assert.equal(identities.complexes["219"], undefined);
   assert.deepEqual(identities.complexes["110632"], ["창곡동|563", "창곡동|564", "창곡동|565"]);
   assert.deepEqual(identities.complexes["108064"], ["남가좌동|385"]);
-  const values = Object.values(identities.complexes).flat();
+  const apartments = JSON.parse(await readFile(new URL("../public/data/apartments.json", import.meta.url), "utf8"));
+  const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
+  const values = Object.entries(identities.complexes).flatMap(([complexId, entries]) => entries.map(identity => `${complexById.get(complexId).regionCode}|${identity}`));
   assert.equal(new Set(values).size, values.length);
   assert.equal(addressIdentityKey("11680", " 개포동 ", "0012-000"), "11680|개포동|12-0");
+});
+
+test("coordinate parcel matching rejects a parcel shared by multiple official complexes", () => {
+  const target = { id: "a", pnu: "1168010300100120000" };
+  assert.equal(uniqueParcelIdentity([target], [target]), target);
+  assert.equal(uniqueParcelIdentity([target], [target, { id: "b", pnu: target.pnu }]), null);
 });
 
 test("apartment areas keep every whole-square-meter group from 59 through 120", () => {

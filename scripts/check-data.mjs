@@ -39,8 +39,16 @@ const invalidAddressIdentities = Object.entries(addressIdentities.complexes || {
   });
 });
 if (invalidAddressIdentities.length || !/^[a-f0-9]{64}$/.test(addressIdentities.source?.sha256 || "")) throw new Error("Apartment address identity data is invalid");
-const addressIdentityValues = Object.values(addressIdentities.complexes || {}).flat();
+const addressIdentityValues = Object.entries(addressIdentities.complexes || {}).flatMap(([complexId, identities]) =>
+  identities.map(identity => `${complexById.get(complexId)?.regionCode}|${identity}`)
+);
 if (new Set(addressIdentityValues).size !== addressIdentityValues.length) throw new Error("Apartment address identities must belong to one complex");
+const staleAddressPrices = Object.entries(prices.complexes).filter(([complexId, record]) => {
+  if (record.matchStatus !== "matched" || record.matchMethod !== "official_address_and_lawd_cd") return false;
+  const configuredAddresses = new Set((addressIdentities.complexes?.[complexId] || []).map(identity => identity.replace("|", " ")));
+  return (record.matchedOfficialAddresses || []).some(address => !configuredAddresses.has(address));
+});
+if (staleAddressPrices.length) throw new Error(`${staleAddressPrices.length} priced records use stale apartment parcel identities`);
 const hiddenPrices = Object.entries(prices.complexes).filter(([complexId, record]) =>
   record.matchStatus === "matched" && Object.values(record.areas || {}).some(area => Number(area?.median) > 0)
     && priceRecordForDisplay(prices, complexId, complexById.get(complexId)?.regionCode) !== record

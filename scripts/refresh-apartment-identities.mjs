@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { addressIdentityKey, normalizeName } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, normalizeName, uniqueParcelIdentity } from "./price-refresh-lib.mjs";
 
 const sourceUrl = "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003521525&fileDetailSn=1&insertDataPrcus=N";
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -61,7 +61,7 @@ async function reverseParcelIdentity(worker, complex) {
     } catch {}
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
-  return "";
+  return null;
 }
 
 const inputPath = args[0];
@@ -100,6 +100,7 @@ const [apartments, aliases] = await Promise.all([
   readFile(path.join(projectDir, "public", "data", "apartments.json"), "utf8").then(JSON.parse),
   readFile(path.join(projectDir, "config", "price-name-aliases.json"), "utf8").then(JSON.parse)
 ]);
+const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
 const complexes = {};
 const methodByComplex = new Map();
 let ambiguous = 0;
@@ -164,32 +165,37 @@ for (const complex of apartments.complexes) {
 
 if (addressWorkerUrl) {
   const worker = new URL(addressWorkerUrl);
+  let failedLookups = 0;
   for (const complex of apartments.complexes.filter(item => !complexes[item.id] && !(aliases[item.id] || []).length)) {
     const identity = await reverseParcelIdentity(worker, complex);
-    if (identity) {
+    if (identity === null) {
+      failedLookups += 1;
+    } else if (identity) {
       const matches = (rowsByRegion.get(complex.regionCode) || []).filter(row => apartmentIdentity(row) === identity);
       const pnu = matches.length ? matches[0].pnu : null;
-      if (pnu && matches.length === 1 && rowsByPnu.get(pnu).length === 1) {
+      if (pnu && uniqueParcelIdentity(matches, rowsByPnu.get(pnu))) {
         complexes[complex.id] = [identity];
         methodByComplex.set(complex.id, "coordinate_parcel");
-        if (unresolvedReasons.get(complex.id) === "ambiguous") ambiguous -= 1;
-        else noCandidate -= 1;
       }
     }
     await new Promise(resolve => setTimeout(resolve, 250));
   }
+  if (failedLookups) throw new Error(`${failedLookups} apartment parcel lookups failed; identity data was not replaced.`);
 }
 
 const ownersByIdentity = new Map();
 for (const [complexId, identities] of Object.entries(complexes)) {
+  const regionCode = complexById.get(complexId)?.regionCode;
   for (const identity of identities) {
-    if (!ownersByIdentity.has(identity)) ownersByIdentity.set(identity, []);
-    ownersByIdentity.get(identity).push(complexId);
+    const key = `${regionCode}|${identity}`;
+    if (!ownersByIdentity.has(key)) ownersByIdentity.set(key, []);
+    ownersByIdentity.get(key).push(complexId);
   }
 }
 const duplicateIdentities = new Set([...ownersByIdentity].filter(([, owners]) => owners.length > 1).map(([identity]) => identity));
 for (const [complexId, identities] of Object.entries(complexes)) {
-  const uniqueIdentities = identities.filter(identity => !duplicateIdentities.has(identity));
+  const regionCode = complexById.get(complexId)?.regionCode;
+  const uniqueIdentities = identities.filter(identity => !duplicateIdentities.has(`${regionCode}|${identity}`));
   if (uniqueIdentities.length) complexes[complexId] = uniqueIdentities;
   else delete complexes[complexId];
 }

@@ -30,6 +30,10 @@ export function addressIdentityKey(regionCode, legalDong, jibun) {
   return /^\d{5}$/.test(region) && dong && /^(?:산)?\d+(?:-\d+)?$/.test(lot) ? `${region}|${dong}|${lot}` : null;
 }
 
+export function uniqueParcelIdentity(matches, parcelRows) {
+  return matches.length === 1 && parcelRows.length === 1 ? matches[0] : null;
+}
+
 export function xmlValue(item, tag) {
   const match = item.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`));
   return match?.[1]?.trim()
