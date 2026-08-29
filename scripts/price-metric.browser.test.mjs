@@ -398,6 +398,8 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
     await evaluate("document.querySelector('.apartment-price-marker').closest('.leaflet-marker-icon').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); true");
     await waitFor(() => evaluate("document.querySelector('#detailPanel').classList.contains('open')"));
     assert.equal(await evaluate("document.querySelector('[data-price-metric].active').dataset.priceMetric"), "max");
+    await evaluate("document.querySelector('#detailContent').innerHTML='<p>stale-area-detail</p>'; document.querySelector('[data-area=\"80-89\"]').click(); true");
+    await waitFor(() => evaluate("document.querySelector('#detailContent').textContent !== 'stale-area-detail'"));
     await evaluate("document.querySelector('[data-price-metric=average]').click(); true");
     assert.match(await evaluate("document.querySelector('#detailPanel .detail-subtitle').textContent"), /평균값/);
     await evaluate("document.querySelector('[data-price-metric=min]').click(); true");

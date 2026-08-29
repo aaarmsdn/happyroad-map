@@ -181,22 +181,6 @@ test("all-area apartment details expose the same target-area maximum as the mark
   assert.doesNotMatch(apartmentDetailHtml({ ...base, selectedArea: "102", priceMetric: "max" }), /전체 면적|64억원/);
 });
 
-test("snapshot details use the same area fallback as the marker", () => {
-  const record = {
-    matchStatus: "snapshot", matchMethod: "official_snapshot_by_complex_id", matchRegionCode: "11590",
-    matchedTradeCount: 58, latestTradeDate: "20260117",
-    areas: { "84": { count: 10, min: 69000, max: 118000 } }
-  };
-  const prices = { snapshot: { sha256: "a".repeat(64) }, complexes: { "45": record } };
-  assert.equal(priceFor(prices, { area: "전체", priceMetric: "max" }, "45", "11590"), 118000);
-  const detail = apartmentDetailHtml({
-    complex: { name: "단지", type: "아파트", households: 100, completed: "2000", externalUrl: "" },
-    relatedLinks: [], record, selectedArea: "전체", priceMetric: "max"
-  });
-  assert.match(detail, /대표 84㎡[\s\S]*11억 8,000만원[\s\S]*10건/);
-  assert.doesNotMatch(detail, /전체 면적|대상 면적 외 거래 포함|58건/);
-});
-
 test("commute result UI exposes breakdown and concrete journey detail", () => {
   const journey = {
     accessMode: "public-transit", accessLabel: "대중교통", routeName: "노선", station: "성수역",
@@ -336,10 +320,10 @@ test("a matched price with another district cannot reach apartment details", () 
   assert.equal(priceRecordForDisplay({ complexes: { "1": record } }, "1", "11200"), null);
 });
 
-test("a pinned official snapshot is displayable only in its current district", () => {
+test("legacy snapshot prices remain unavailable until the current API matches them", () => {
   const record = { matchStatus: "snapshot", matchMethod: "official_snapshot_by_complex_id", matchRegionCode: "11200", areas: { "84": { count: 1, median: 100000 } } };
   const prices = { snapshot: { sha256: "a".repeat(64) }, complexes: { "1": record } };
-  assert.equal(priceRecordForDisplay(prices, "1", "11200"), record);
+  assert.equal(priceRecordForDisplay(prices, "1", "11200"), null);
   assert.equal(priceRecordForDisplay(prices, "1", "99999"), null);
 });
 

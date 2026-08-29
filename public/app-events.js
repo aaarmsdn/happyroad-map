@@ -49,6 +49,7 @@ export function bindEvents({ state, syncControls, renderMap, renderSelectedApart
     state.area = button.dataset.area !== "전체" && state.area === button.dataset.area ? "" : button.dataset.area;
     syncControls();
     renderMap();
+    renderSelectedApartmentDetail();
   }));
   $$("#priceMetricControl .segment").forEach(button => button.addEventListener("click", () => {
     setPriceMetric(button.dataset.priceMetric);

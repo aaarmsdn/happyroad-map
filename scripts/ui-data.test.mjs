@@ -22,8 +22,12 @@ test("snapshot importer preserves every observed 59-to-120 area key", async () =
         latestTradeDate: "20260828",
         areas: {
           "58": { count: 1, max: 58000 },
+          "59": { count: 1, max: 59000 },
           "76": { count: 1, max: 76000 },
+          "84e0": { count: 1, max: 84000 },
+          "90": { count: 0, max: 90000 },
           "118": { count: 1, max: 118000 },
+          "120": { count: 1, max: 120000 },
           "121": { count: 1, max: 121000 }
         }
       }
@@ -59,8 +63,8 @@ test("snapshot importer preserves every observed 59-to-120 area key", async () =
     assert.equal(result.code, 0, result.stderr);
     const apartments = JSON.parse(await readFile(path.join(tempDir, "public", "data", "apartments.json"), "utf8"));
     const prices = JSON.parse(await readFile(path.join(tempDir, "public", "data", "prices.json"), "utf8"));
-    assert.deepEqual(apartments.complexes[0].areaTags, ["70-79", "110-120"]);
-    assert.deepEqual(Object.keys(prices.complexes["1"].areas), ["76", "118"]);
+    assert.deepEqual(apartments.complexes[0].areaTags, ["59-69", "70-79", "110-120"]);
+    assert.deepEqual(Object.keys(prices.complexes["1"].areas), ["59", "76", "118", "120"]);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

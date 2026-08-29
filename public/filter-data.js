@@ -193,4 +193,4 @@ export function matchingApartmentLinks(links, state, stationDirections, complexB
   return result;
 }
 
-export { apartmentColor, priceColor, priceFor, priceMetric, pricePerPyeong, pricePerPyeongFor, priceRecordForDisplay, representativeAreaPrice, transactionPrice, transactionPricePerPyeong } from "./price-data.js?v=3";
+export { apartmentColor, priceColor, priceFor, priceMetric, pricePerPyeong, pricePerPyeongFor, priceRecordForDisplay, representativeAreaPrice, transactionPrice, transactionPricePerPyeong } from "./price-data.js?v=4";

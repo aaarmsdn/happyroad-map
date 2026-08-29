@@ -30,7 +30,7 @@ if (Object.values(prices.complexes).some(record => "naverMarker" in record || "t
 if (JSON.stringify(prices).toLowerCase().includes("naver")) throw new Error("Third-party price provenance must not be committed");
 const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
 const hiddenPrices = Object.entries(prices.complexes).filter(([complexId, record]) =>
-  Object.values(record.areas || {}).some(area => Number(area?.median) > 0)
+  record.matchStatus === "matched" && Object.values(record.areas || {}).some(area => Number(area?.median) > 0)
     && priceRecordForDisplay(prices, complexId, complexById.get(complexId)?.regionCode) !== record
 );
 if (hiddenPrices.length) throw new Error(`${hiddenPrices.length} priced records do not satisfy display provenance rules`);
@@ -40,7 +40,7 @@ if (snapshotRecords.some(record => record.source !== snapshotProvenance.source))
 const missingAreaTags = Object.entries(prices.complexes).flatMap(([complexId, record]) => Object.entries(record.areas || {})
   .filter(([band, area]) => {
     const tags = complexById.get(complexId)?.areaTags || [];
-    return Number(area?.median) > 0 && (!isCanonicalAreaKey(band) || !tags.includes(areaRange(band)));
+    return !isCanonicalAreaKey(band) || (Number(area?.median) > 0 && !tags.includes(areaRange(band)));
   })
   .map(([area]) => `${complexId}:${area}`));
 if (missingAreaTags.length) throw new Error(`${missingAreaTags.length} priced apartment areas are missing filter tags`);
