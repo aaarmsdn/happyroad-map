@@ -3,7 +3,7 @@ import { areaKeysForSelection } from "./area-data.js?v=1";
 export function priceRecordForDisplay(prices, complexId, expectedRegionCode) {
   const record = prices.complexes[complexId];
   const currentApiMatch = record?.matchStatus === "matched"
-    && ["normalized_name_and_lawd_cd_from_boundary", "configured_alias_and_lawd_cd_from_boundary", "unique_containment_name_and_lawd_cd_from_boundary"].includes(record.matchMethod);
+    && ["official_address_and_lawd_cd", "normalized_name_and_lawd_cd_from_boundary", "configured_alias_and_lawd_cd_from_boundary", "unique_containment_name_and_lawd_cd_from_boundary"].includes(record.matchMethod);
   if (!/^\d{5}$/.test(expectedRegionCode) || !currentApiMatch || record.matchRegionCode !== expectedRegionCode) return null;
   return record;
 }

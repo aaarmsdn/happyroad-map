@@ -330,6 +330,11 @@ test("a matched price with another district cannot reach apartment details", () 
   assert.equal(priceRecordForDisplay({ complexes: { "1": record } }, "1", "11200"), null);
 });
 
+test("an official parcel match reaches apartment details", () => {
+  const record = { matchStatus: "matched", matchMethod: "official_address_and_lawd_cd", matchRegionCode: "11200", areas: { "84": { count: 1, max: 100000 } } };
+  assert.equal(priceRecordForDisplay({ complexes: { "1": record } }, "1", "11200"), record);
+});
+
 test("legacy snapshot prices remain unavailable until the current API matches them", () => {
   const record = { matchStatus: "snapshot", matchMethod: "official_snapshot_by_complex_id", matchRegionCode: "11200", areas: { "84": { count: 1, median: 100000 } } };
   const prices = { snapshot: { sha256: "a".repeat(64) }, complexes: { "1": record } };
