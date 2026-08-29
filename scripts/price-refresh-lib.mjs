@@ -52,6 +52,12 @@ export function hasLostOfficialParcelIdentity(record, identities) {
     && (!Array.isArray(identities) || !identities.length);
 }
 
+export function isCompatibleBuildYear(completed, officialYear) {
+  const completedYear = Number(String(completed || "").slice(0, 4)) || 0;
+  const buildYear = Number(officialYear) || 0;
+  return !completedYear || !buildYear || Math.abs(completedYear - buildYear) <= 2;
+}
+
 export function xmlValue(item, tag) {
   const match = item.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`));
   return match?.[1]?.trim()

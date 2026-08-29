@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { addressIdentityKey, comparableName, eligibleAddressIds, fetchMonth, hasLostOfficialParcelIdentity, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, comparableName, eligibleAddressIds, fetchMonth, hasLostOfficialParcelIdentity, isCompatibleBuildYear, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { officialRegionCodeFor, prepareDistricts } from "./region-match.mjs";
 import { replaceFiles } from "./replace-files.mjs";
 import { APARTMENT_AREA_RANGES, areaKey, areaTagsForValues } from "../public/area-data.js";
@@ -101,8 +101,12 @@ for (const [complexId, identities] of Object.entries(addressIdentities.complexes
 const idsForTradeAddress = trade => idsByAddress.get(addressIdentityKey(trade.regionCode, trade.legalDong, trade.jibun)) || [];
 const eligibleIdsFor = (ids, trade) => {
   const tradeKey = addressIdentityKey(trade.regionCode, trade.legalDong, trade.jibun);
-  return eligibleAddressIds(ids, tradeKey, addressesByComplex);
+  return eligibleAddressIds(ids, tradeKey, addressesByComplex).filter(id => {
+    if (addressesByComplex.has(id) || !trade.buildYear) return true;
+    return isCompatibleBuildYear(complexById.get(id)?.completed, trade.buildYear);
+  });
 };
+const inferredKeyForTrade = trade => `${trade.regionCode}:${normalizeName(trade.name)}:${trade.buildYear || ""}`;
 
 const trades = [];
 for (const regionCode of regionCodes) {
@@ -119,7 +123,7 @@ const claimedTradeNamesByComplex = new Map();
 // Multiple official names for one inferred complex require a reviewed explicit alias.
 for (const trade of targetTrades) {
   const normalizedTradeName = normalizeName(trade.name);
-  const cacheKey = `${trade.regionCode}:${normalizedTradeName}`;
+  const cacheKey = inferredKeyForTrade(trade);
   if (inferredIdsByTradeName.has(cacheKey)) continue;
   const exactIds = eligibleIdsFor((idsByName.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode), trade);
   const aliasIds = eligibleIdsFor((idsByAlias.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode), trade);
@@ -139,10 +143,6 @@ for (const trade of targetTrades) {
       && numberSignature(complex.name) === tradeNumbers
       && (tradeName.includes(complexName) || complexName.includes(tradeName));
   }).filter(complex => eligibleIdsFor([complex.id], trade).length);
-  if (candidates.length > 1 && trade.buildYear) {
-    const sameBuildYear = candidates.filter(complex => Number(String(complex.completed || "").slice(0, 4)) === trade.buildYear);
-    if (sameBuildYear.length === 1) candidates = sameBuildYear;
-  }
   const ids = candidates.length === 1 ? [candidates[0].id] : [];
   inferredIdsByTradeName.set(cacheKey, ids);
   if (ids.length) {
@@ -196,7 +196,7 @@ for (const trade of targetTrades) {
     if (regionIds.length) matchMethod = "configured_alias_and_lawd_cd_from_boundary";
   }
   if (!regionIds.length) {
-    const cacheKey = `${trade.regionCode}:${normalizeName(trade.name)}`;
+    const cacheKey = inferredKeyForTrade(trade);
     regionIds = eligibleIdsFor(inferredIdsByTradeName.get(cacheKey) || [], trade);
     if (regionIds.length) matchMethod = "unique_containment_name_and_lawd_cd_from_boundary";
     else if (collidingInferredKeys.has(cacheKey)) {

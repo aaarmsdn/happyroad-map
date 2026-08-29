@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { areaRange, isCanonicalAreaKey } from "../public/area-data.js";
 import { priceRecordForDisplay } from "../public/filter-data.js";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
-import { addressIdentityKey, hasLostOfficialParcelIdentity } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, hasLostOfficialParcelIdentity, isCompatibleBuildYear } from "./price-refresh-lib.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(projectDir, "public", "data");
@@ -53,6 +53,12 @@ const staleAddressPrices = Object.entries(prices.complexes).filter(([complexId, 
   return record.matchedOfficialAddresses.some(address => !configuredAddresses.has(address));
 });
 if (staleAddressPrices.length) throw new Error(`${staleAddressPrices.length} priced records use stale apartment parcel identities`);
+const incompatibleBuildYears = Object.entries(prices.complexes).filter(([complexId, record]) =>
+  record.matchStatus === "matched"
+  && record.matchMethod !== "official_address_and_lawd_cd"
+  && (record.matchedBuildYears || []).some(year => !isCompatibleBuildYear(complexById.get(complexId)?.completed, year))
+);
+if (incompatibleBuildYears.length) throw new Error(`${incompatibleBuildYears.length} name-matched apartment prices have incompatible build years`);
 const hiddenPrices = Object.entries(prices.complexes).filter(([complexId, record]) =>
   record.matchStatus === "matched" && Object.values(record.areas || {}).some(area => Number(area?.median) > 0)
     && priceRecordForDisplay(prices, complexId, complexById.get(complexId)?.regionCode) !== record
