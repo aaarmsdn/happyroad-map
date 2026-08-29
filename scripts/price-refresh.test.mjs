@@ -72,9 +72,11 @@ test("coordinate parcel matching rejects a parcel shared by multiple official co
 
 test("name matching rejects shared parcels unless a reviewed alias allows them", () => {
   const first = { id: "a", pnu: "p" };
-  const rows = new Map([["p", [first, { id: "b", pnu: "p" }]]]);
+  const second = { id: "b", pnu: "p" };
+  const rows = new Map([["p", [first, second]]]);
   assert.deepEqual(safeParcelRows([first], rows), []);
-  assert.deepEqual(safeParcelRows([first], rows, true), [first]);
+  assert.deepEqual(safeParcelRows([first], rows, true), []);
+  assert.deepEqual(safeParcelRows([first, second], rows, true), [first, second]);
 });
 
 test("parcel-configured complexes require a complete matching trade address", () => {

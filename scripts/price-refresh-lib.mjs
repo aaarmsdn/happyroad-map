@@ -35,7 +35,11 @@ export function uniqueParcelIdentity(matches, parcelRows) {
 }
 
 export function safeParcelRows(chosen, rowsByPnu, allowShared = false) {
-  return chosen.filter(row => allowShared || rowsByPnu.get(row.pnu)?.length === 1);
+  const chosenIds = new Set(chosen.map(row => row.id));
+  return chosen.filter(row => {
+    const parcelRows = rowsByPnu.get(row.pnu) || [];
+    return parcelRows.length === 1 || (allowShared && parcelRows.length > 1 && parcelRows.every(candidate => chosenIds.has(candidate.id)));
+  });
 }
 
 export function eligibleAddressIds(ids, tradeKey, addressesByComplex) {
