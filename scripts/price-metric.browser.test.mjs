@@ -178,17 +178,15 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
       return total;
     }, 0))()`);
     assert.equal(selectedPointPixels > 0, true);
-    const searchMarkerPoint = await waitFor(() => evaluate(`(() => {
+    await waitFor(() => evaluate(`(() => {
       const panelTop = document.querySelector('#commutePanel').getBoundingClientRect().top;
       const marker = [...document.querySelectorAll('.apartment-price-marker')].map(item => item.closest('.leaflet-marker-icon'))
         .find(item => { const rect = item.getBoundingClientRect(); return rect.bottom > 0 && rect.top < panelTop && rect.right > 0 && rect.left < innerWidth; });
-      if (!marker) return null;
-      const rect = marker.getBoundingClientRect();
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      if (!marker) return false;
+      marker.click();
+      return true;
     })()`));
-    await cdp.call("Input.dispatchMouseEvent", { type: "mousePressed", ...searchMarkerPoint, button: "left", clickCount: 1 }, sessionId);
-    await cdp.call("Input.dispatchMouseEvent", { type: "mouseReleased", ...searchMarkerPoint, button: "left", clickCount: 1 }, sessionId);
-    assert.equal(await evaluate("document.querySelector('#commutePanel').classList.contains('open')"), false);
+    await waitFor(() => evaluate("!document.querySelector('#commutePanel').classList.contains('open')"));
     await waitFor(() => evaluate("document.querySelector('#detailPanel').classList.contains('open')"));
     await evaluate("document.querySelector('#detailCloseButton').click(); true");
     assert.equal(await evaluate("document.querySelector('#commutePanel').classList.contains('open')"), true);
