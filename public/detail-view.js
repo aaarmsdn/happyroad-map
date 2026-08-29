@@ -1,5 +1,5 @@
 import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
-import { priceMetric, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=37";
+import { overallTransactionPrice, overallTransactionPricePerPyeong, priceMetric, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=38";
 
 export function stopDetailHtml(stop) {
   const variants = [...new Map(stop.entries.map(entry => [entry.uidKey, entry])).values()]
@@ -62,11 +62,13 @@ function areaMetrics(record, selectedArea, selectedMetric) {
     ? Object.keys(record?.areas || {}).sort((a, b) => Number(a) - Number(b))
     : [selectedArea];
   const available = ordered.filter(area => Number(record?.areas?.[area]?.count) > 0);
-  const overallAmount = transactionPrice(record, metric);
-  const overallPerPyeong = Number(record?.[`${metric}PerPyeong`]);
+  const overallAmount = overallTransactionPrice(record, metric);
+  const overallPerPyeong = overallTransactionPricePerPyeong(record, metric);
   const overallValues = [overallAmount ? formatPrice(overallAmount) : "", overallPerPyeong > 0 ? `평당 ${overallPerPyeong.toLocaleString("ko-KR")}만` : ""].filter(Boolean).join(" · ");
+  const areaTradeCount = Object.values(record?.areas || {}).reduce((sum, data) => sum + (Number(data?.count) || 0), 0);
+  const outsideAreaNote = Number(record?.matchedTradeCount) > areaTradeCount ? " · 대상 면적 외 거래 포함" : "";
   const overallRow = selectedArea === "전체" && overallValues
-    ? `<div class="price-row price-overall"><b>전체 면적</b><span>${overallValues}</span><small>${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건 · 대상 면적 외 거래 포함</small></div>` : "";
+    ? `<div class="price-row price-overall"><b>전체 면적</b><span>${overallValues}</span><small>${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건${outsideAreaNote}</small></div>` : "";
   if (!available.length && overallRow) return `<div class="price-list">${overallRow}</div>`;
   if (!available.length && selectedArea === "전체" && Number(record?.matchedTradeCount) > 0) {
     return `<p class="empty-note">${priceMetricLabels[metric]} 갱신 대기 · 최근 거래 ${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건</p>`;

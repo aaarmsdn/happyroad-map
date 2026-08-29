@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import vm from "node:vm";
 import { commuteJourneyDetailHtml, commuteResultsHtml } from "../public/commute-view.js";
 import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "../public/detail-view.js";
-import { apartmentDoorTimes, apartmentStopTimings, priceRecordForDisplay, stopRepresentativeMinutes } from "../public/filter-data.js";
+import { apartmentDoorTimes, apartmentStopTimings, priceFor, priceRecordForDisplay, stopRepresentativeMinutes } from "../public/filter-data.js";
 import { formatDate, safeExternalUrl } from "../public/ui-utils.js";
 
 const read = name => readFile(new URL(`../${name}`, import.meta.url), "utf8");
@@ -27,9 +27,13 @@ test("public app metadata does not identify a specific employer", async () => {
 
 test("header omits branding while each filter owns its update date", async () => {
   const html = await read("public/index.html");
+  const shuttleView = html.slice(html.indexOf('data-view="shuttle"'), html.indexOf('data-view="apartment"'));
+  const apartmentView = html.slice(html.indexOf('data-view="apartment"'), html.indexOf('<div class="panel-footer">'));
   assert.doesNotMatch(html, /class="brand-block"|id="dataFreshness"/);
-  assert.match(html, /data-view="shuttle"[\s\S]*id="shuttleFreshness"/);
-  assert.match(html, /data-view="apartment"[\s\S]*id="apartmentFreshness"/);
+  assert.match(shuttleView, /id="shuttleFreshness"/);
+  assert.doesNotMatch(shuttleView, /id="apartmentFreshness"/);
+  assert.match(apartmentView, /id="apartmentFreshness"/);
+  assert.doesNotMatch(apartmentView, /id="shuttleFreshness"/);
 });
 
 test("stop details show shuttle duration and arrival time in both directions", () => {
@@ -159,7 +163,8 @@ test("apartment details show only the available stop direction", () => {
 
 test("all-area apartment details expose the same overall maximum as the marker", () => {
   const record = {
-    matchStatus: "matched", matchedTradeCount: 14, latestTradeDate: "20260701",
+    matchStatus: "matched", matchMethod: "unique_containment_name_and_lawd_cd_from_boundary", matchRegionCode: "41135",
+    matchedTradeCount: 14, latestTradeDate: "20260701",
     max: 640000, maxPerPyeong: 10383,
     areas: {
       "102": { count: 2, min: 236000, max: 250000, maxPerPyeong: 8596 },
@@ -168,9 +173,31 @@ test("all-area apartment details expose the same overall maximum as the marker",
   };
   const base = { complex: { name: "알파리움1단지", type: "아파트", households: 417, completed: "2015", externalUrl: "" }, relatedLinks: [], record };
   const allAreas = apartmentDetailHtml({ ...base, selectedArea: "전체", priceMetric: "max" });
+  assert.equal(priceFor({ complexes: { "106922": record } }, { area: "전체", priceMetric: "max" }, "106922", "41135"), 640000);
   assert.match(allAreas, /전체 면적[\s\S]*64억원[\s\S]*14건/);
   assert.match(allAreas, /102㎡[\s\S]*25억원/);
+  assert.match(allAreas, /115㎡[\s\S]*26억 9,500만원/);
   assert.doesNotMatch(apartmentDetailHtml({ ...base, selectedArea: "102", priceMetric: "max" }), /전체 면적|64억원/);
+});
+
+test("snapshot details use the same area fallback as the marker", () => {
+  const record = {
+    matchStatus: "snapshot", matchMethod: "official_snapshot_by_complex_id", matchRegionCode: "11590",
+    matchedTradeCount: 58, latestTradeDate: "20260117",
+    areas: { "84": { count: 10, min: 69000, max: 118000 } }
+  };
+  const prices = { snapshot: { sha256: "a".repeat(64) }, complexes: { "45": record } };
+  assert.equal(priceFor(prices, { area: "전체", priceMetric: "max" }, "45", "11590"), 118000);
+  const detail = apartmentDetailHtml({
+    complex: { name: "단지", type: "아파트", households: 100, completed: "2000", externalUrl: "" },
+    relatedLinks: [], record, selectedArea: "전체", priceMetric: "max"
+  });
+  assert.match(detail, /전체 면적[\s\S]*11억 8,000만원/);
+  assert.match(detail, /58건 · 대상 면적 외 거래 포함/);
+  assert.doesNotMatch(apartmentDetailHtml({
+    complex: { name: "단지", type: "아파트", households: 100, completed: "2000", externalUrl: "" },
+    relatedLinks: [], record: { ...record, matchedTradeCount: 10 }, selectedArea: "전체", priceMetric: "max"
+  }), /대상 면적 외 거래 포함/);
 });
 
 test("commute result UI exposes breakdown and concrete journey detail", () => {

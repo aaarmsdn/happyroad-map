@@ -25,17 +25,7 @@ function pricePointFor(prices, state, complexId, expectedRegionCode) {
 export function priceFor(prices, state, complexId, expectedRegionCode) {
   if (state.area === "전체") {
     const record = priceRecordForDisplay(prices, complexId, expectedRegionCode);
-    const metric = priceMetric(state.priceMetric);
-    const exact = transactionPrice(record, metric);
-    if (exact) return exact;
-    const groups = Object.entries(record?.areas || {}).map(([, data]) => {
-      return { count: Number(data?.count) || 0, value: transactionPrice(data, metric) };
-    }).filter(group => group.count > 0 && group.value);
-    if (!groups.length) return null;
-    if (metric === "max") return Math.max(...groups.map(group => group.value));
-    if (metric === "min") return Math.min(...groups.map(group => group.value));
-    const count = groups.reduce((sum, group) => sum + group.count, 0);
-    return Math.round(groups.reduce((sum, group) => sum + group.value * group.count, 0) / count);
+    return overallTransactionPrice(record, state.priceMetric);
   }
   return pricePointFor(prices, state, complexId, expectedRegionCode)?.amount ?? null;
 }
@@ -63,20 +53,40 @@ export function transactionPricePerPyeong(data, area, metricValue = "max") {
   return pricePerPyeong(transactionPrice(data, metric), area);
 }
 
+function aggregateMetric(groups, metric) {
+  if (!groups.length) return null;
+  if (metric === "max") return Math.max(...groups.map(group => group.value));
+  if (metric === "min") return Math.min(...groups.map(group => group.value));
+  const count = groups.reduce((sum, group) => sum + group.count, 0);
+  return Math.round(groups.reduce((sum, group) => sum + group.value * group.count, 0) / count);
+}
+
+export function overallTransactionPrice(record, metricValue = "max") {
+  const metric = priceMetric(metricValue);
+  const exact = transactionPrice(record, metric);
+  if (exact) return exact;
+  const groups = Object.values(record?.areas || {}).map(data => ({
+    count: Number(data?.count) || 0,
+    value: transactionPrice(data, metric)
+  })).filter(group => group.count > 0 && group.value);
+  return aggregateMetric(groups, metric);
+}
+
+export function overallTransactionPricePerPyeong(record, metricValue = "max") {
+  const metric = priceMetric(metricValue);
+  const exact = Number(record?.[`${metric}PerPyeong`]);
+  if (exact > 0) return exact;
+  const groups = Object.entries(record?.areas || {}).map(([area, data]) => ({
+    count: Number(data?.count) || 0,
+    value: transactionPricePerPyeong(data, area, metric)
+  })).filter(group => group.count > 0 && group.value);
+  return aggregateMetric(groups, metric);
+}
+
 export function pricePerPyeongFor(prices, state, complexId, expectedRegionCode) {
   if (state.area === "전체") {
     const record = priceRecordForDisplay(prices, complexId, expectedRegionCode);
-    const metric = priceMetric(state.priceMetric);
-    const exact = Number(record?.[`${metric}PerPyeong`]);
-    if (exact > 0) return exact;
-    const groups = Object.entries(record?.areas || {}).map(([area, data]) => {
-      return { count: Number(data?.count) || 0, value: transactionPricePerPyeong(data, area, metric) };
-    }).filter(group => group.count > 0 && group.value);
-    const total = groups.reduce((sum, group) => sum + group.count, 0);
-    if (!total) return null;
-    if (metric === "max") return Math.max(...groups.map(group => group.value));
-    if (metric === "min") return Math.min(...groups.map(group => group.value));
-    return Math.round(groups.reduce((sum, group) => sum + group.value * group.count, 0) / total);
+    return overallTransactionPricePerPyeong(record, state.priceMetric);
   }
   const point = pricePointFor(prices, state, complexId, expectedRegionCode);
   return point?.perPyeong ?? null;
