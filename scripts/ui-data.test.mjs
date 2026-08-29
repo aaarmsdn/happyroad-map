@@ -230,7 +230,7 @@ test("price refresh adds newly observed official unit sizes to apartment filters
   apartmentFixture.complexes.find(complex => complex.id === "8104").areaTags = ["102"];
   await writeFile(apartmentPath, JSON.stringify(apartmentFixture));
   const preloadPath = path.join(tempDir, "two-molit-trades.mjs");
-  await writeFile(preloadPath, `globalThis.fetch = async () => new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>2</totalCount><items><item><aptNm>성수롯데캐슬파크</aptNm><excluUseAr>59.8</excluUseAr><dealAmount>150,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>성수롯데캐슬파크</aptNm><excluUseAr>76.4</excluUseAr><dealAmount>170,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item></items></body></response>\`, { status: 200 });`);
+  await writeFile(preloadPath, `globalThis.fetch = async () => new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>2</totalCount><items><item><aptNm>성수롯데캐슬파크</aptNm><umdNm>성수동2가</umdNm><jibun>835</jibun><excluUseAr>59.8</excluUseAr><dealAmount>150,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>성수롯데캐슬파크</aptNm><umdNm>성수동2가</umdNm><jibun>835</jibun><excluUseAr>76.4</excluUseAr><dealAmount>170,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item></items></body></response>\`, { status: 200 });`);
 
   try {
     const result = await new Promise(resolve => {

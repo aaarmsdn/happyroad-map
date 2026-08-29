@@ -56,7 +56,7 @@ test("official parcel identities cover safe aggregates and reject shared parcels
   assert.equal(identities.complexes["201"], undefined);
   assert.equal(identities.complexes["219"], undefined);
   assert.deepEqual(identities.complexes["110632"], ["창곡동|563", "창곡동|564", "창곡동|565"]);
-  assert.deepEqual(identities.complexes["108064"], ["남가좌동|385"]);
+  assert.equal(identities.complexes["108064"], undefined);
   const apartments = JSON.parse(await readFile(new URL("../public/data/apartments.json", import.meta.url), "utf8"));
   const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
   const values = Object.entries(identities.complexes).flatMap(([complexId, entries]) => entries.map(identity => `${complexById.get(complexId).regionCode}|${identity}`));
