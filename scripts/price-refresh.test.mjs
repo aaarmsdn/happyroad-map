@@ -311,6 +311,7 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
   ]);
   const apartmentPath = path.join(tempDir, "public", "data", "apartments.json");
   const pricePath = path.join(tempDir, "public", "data", "prices.json");
+  const identityPath = path.join(tempDir, "config", "price-address-identities.json");
   await Promise.all([
     writeFile(apartmentPath, JSON.stringify({
       source: {}, stats: {}, complexes: [
@@ -339,7 +340,7 @@ test("price refresh matches official neighborhood-prefixed apartment names", asy
     writeFile(path.join(tempDir, "config", "price-name-aliases.json"), JSON.stringify({
       "97": ["자양우성7"], "98": ["자양현대7"], "99": ["자양현대7"], "104": ["공식별칭파크"]
     })),
-    writeFile(path.join(tempDir, "config", "price-address-identities.json"), JSON.stringify({
+    writeFile(identityPath, JSON.stringify({
       complexes: { "97": ["자양동|100"] }
     }))
   ]);
@@ -409,6 +410,27 @@ process.on("exit", () => console.error(\`FETCH_MONTHS=\${months.join(",")}\nREQU
     });
     assert.deepEqual(months, expectedMonths);
     assert.match(result.stderr, /REQUESTS=13/);
+
+    const beforeIdentityLoss = await readFile(pricePath);
+    const identityContents = await readFile(identityPath);
+    const identities = JSON.parse(identityContents);
+    delete identities.complexes["97"];
+    await writeFile(identityPath, JSON.stringify(identities));
+    try {
+      const identityLoss = await new Promise(resolve => {
+        const child = spawn(process.execPath, ["--import", pathToFileURL(preloadPath).href, path.join(tempDir, "scripts", "refresh-prices.mjs")], {
+          env: { ...process.env, MOLIT_API_KEY: "test", MOLIT_REGION_CODES: "11215", MOLIT_MONTHS: "1", MOLIT_RETRY_DELAY_MS: "0" }
+        });
+        let stderr = "";
+        child.stderr.on("data", chunk => { stderr += chunk; });
+        child.on("close", code => resolve({ code, stderr }));
+      });
+      assert.notEqual(identityLoss.code, 0);
+      assert.match(identityLoss.stderr, /previous official apartment prices lost parcel identity/);
+      assert.deepEqual(await readFile(pricePath), beforeIdentityLoss);
+    } finally {
+      await writeFile(identityPath, identityContents);
+    }
 
     const beforeFailures = await readFile(pricePath);
     const rejectsRefresh = async (filename, source, message) => {

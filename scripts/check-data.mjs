@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { areaRange, isCanonicalAreaKey } from "../public/area-data.js";
 import { priceRecordForDisplay } from "../public/filter-data.js";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
-import { addressIdentityKey } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, hasLostOfficialParcelIdentity } from "./price-refresh-lib.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(projectDir, "public", "data");
@@ -46,7 +46,7 @@ if (new Set(addressIdentityValues).size !== addressIdentityValues.length) throw 
 const staleAddressPrices = Object.entries(prices.complexes).filter(([complexId, record]) => {
   if (record.matchStatus !== "matched") return false;
   const identities = addressIdentities.complexes?.[complexId] || [];
-  if (!identities.length) return record.matchMethod === "official_address_and_lawd_cd";
+  if (!identities.length) return hasLostOfficialParcelIdentity(record, identities);
   if (record.matchMethod !== "official_address_and_lawd_cd") return true;
   if (!Array.isArray(record.matchedOfficialAddresses) || !record.matchedOfficialAddresses.length) return true;
   const configuredAddresses = new Set(identities.map(identity => identity.replace("|", " ")));

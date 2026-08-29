@@ -46,6 +46,12 @@ export function eligibleAddressIds(ids, tradeKey, addressesByComplex) {
   return ids.filter(id => !addressesByComplex.has(id) || Boolean(tradeKey && addressesByComplex.get(id).has(tradeKey)));
 }
 
+export function hasLostOfficialParcelIdentity(record, identities) {
+  return record?.matchStatus === "matched"
+    && record.matchMethod === "official_address_and_lawd_cd"
+    && (!Array.isArray(identities) || !identities.length);
+}
+
 export function xmlValue(item, tag) {
   const match = item.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`));
   return match?.[1]?.trim()

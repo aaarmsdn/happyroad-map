@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { addressIdentityKey, comparableName, eligibleAddressIds, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, comparableName, eligibleAddressIds, fetchMonth, hasLostOfficialParcelIdentity, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { officialRegionCodeFor, prepareDistricts } from "./region-match.mjs";
 import { replaceFiles } from "./replace-files.mjs";
 import { APARTMENT_AREA_RANGES, areaKey, areaTagsForValues } from "../public/area-data.js";
@@ -45,6 +45,10 @@ const [apartments, prices, boundaries, nameAliases, addressIdentities] = await P
   readFile(aliasPath, "utf8").then(JSON.parse),
   readFile(addressIdentityPath, "utf8").then(JSON.parse)
 ]);
+const lostOfficialIdentities = Object.entries(prices.complexes || {}).filter(([complexId, record]) =>
+  hasLostOfficialParcelIdentity(record, addressIdentities.complexes?.[complexId])
+);
+if (lostOfficialIdentities.length) throw new Error(`${lostOfficialIdentities.length} previous official apartment prices lost parcel identity`);
 
 const districts = prepareDistricts(boundaries);
 const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
