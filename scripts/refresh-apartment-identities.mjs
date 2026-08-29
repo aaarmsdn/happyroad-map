@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeName } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, normalizeName } from "./price-refresh-lib.mjs";
 
 const sourceUrl = "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003521525&fileDetailSn=1&insertDataPrcus=N";
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -125,7 +125,10 @@ for (const complex of apartments.complexes) {
   }
   const chosenIds = new Set(chosen.map(row => row.id));
   const safeRows = chosen.filter(row => rowsByPnu.get(row.pnu).every(candidate => chosenIds.has(candidate.id)));
-  const identities = [...new Set(safeRows.map(apartmentIdentity).filter(Boolean))].sort((left, right) => left.localeCompare(right, "ko"));
+  const identities = [...new Set(safeRows.map(apartmentIdentity).filter(identity => {
+    const [legalDong, jibun] = String(identity || "").split("|");
+    return addressIdentityKey(complex.regionCode, legalDong, jibun);
+  }))].sort((left, right) => left.localeCompare(right, "ko"));
   if (identities.length) {
     complexes[complex.id] = identities;
     methods[method] = (methods[method] || 0) + 1;

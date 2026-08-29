@@ -27,7 +27,7 @@ export function addressIdentityKey(regionCode, legalDong, jibun) {
   const region = String(regionCode || "").trim();
   const dong = String(legalDong || "").normalize("NFKC").trim().replace(/\s+/g, " ");
   const lot = String(jibun || "").normalize("NFKC").trim().replace(/\d+/g, value => String(Number(value)));
-  return /^\d{5}$/.test(region) && dong && lot ? `${region}|${dong}|${lot}` : null;
+  return /^\d{5}$/.test(region) && dong && /^(?:산)?\d+(?:-\d+)?$/.test(lot) ? `${region}|${dong}|${lot}` : null;
 }
 
 export function xmlValue(item, tag) {
