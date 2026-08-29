@@ -192,6 +192,55 @@ test("identity refresh rejects a sparse official CSV without replacing the ledge
   }
 });
 
+test("identity refresh enforces shared-PNU rules across official row types", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "happyroad-shared-pnu-"));
+  await Promise.all([
+    mkdir(path.join(tempDir, "scripts"), { recursive: true }),
+    mkdir(path.join(tempDir, "config"), { recursive: true }),
+    mkdir(path.join(tempDir, "public", "data"), { recursive: true })
+  ]);
+  await Promise.all([
+    "refresh-apartment-identities.mjs",
+    "price-refresh-lib.mjs",
+    "replace-files.mjs"
+  ].map(file => copyFile(fileURLToPath(new URL(file, import.meta.url)), path.join(tempDir, "scripts", file))));
+  const complexes = [
+    { id: "1", name: "공유단지", regionCode: "11680", households: 100, completed: "2020-01-01" },
+    { id: "2", name: "검토별칭", regionCode: "11680", households: 300, completed: "2020-01-01" },
+    { id: "3", name: "타입혼합", regionCode: "11680", households: 100, completed: "2020-01-01" }
+  ].map(complex => ({ ...complex, lat: 37.5, lng: 127 }));
+  await Promise.all([
+    writeFile(path.join(tempDir, "public", "data", "apartments.json"), JSON.stringify({ complexes })),
+    writeFile(path.join(tempDir, "config", "price-name-aliases.json"), JSON.stringify({ "2": ["별칭A", "별칭B"] })),
+    writeFile(path.join(tempDir, "config", "price-address-identities.json"), JSON.stringify({ complexes: {} }))
+  ]);
+  const csvPath = path.join(tempDir, "official.csv");
+  await writeFile(csvPath, [
+    "단지고유번호,필지고유번호,법정동주소,단지명1,단지명2,단지명3,단지구분,도로명주소,세대수,사용승인일",
+    "1,1168010300100010000,서울특별시 강남구 테스트동 1,공유단지,,,1,,100,20200101",
+    "4,1168010300100010000,서울특별시 강남구 테스트동 4,다른단지,,,1,,200,20200101",
+    "2,1168010300100020000,서울특별시 강남구 테스트동 2,별칭A,,,1,,100,20200101",
+    "5,1168010300100020000,서울특별시 강남구 테스트동 3,별칭B,,,1,,200,20200101",
+    "3,1168010300100030000,서울특별시 강남구 테스트동 5,타입혼합,,,1,,100,20200101",
+    "6,1168010300100030000,서울특별시 강남구 테스트동 6,상가행,,,2,,10,20200101"
+  ].join("\n"));
+  try {
+    const result = await new Promise(resolve => {
+      const child = spawn(process.execPath, [path.join(tempDir, "scripts", "refresh-apartment-identities.mjs"), csvPath]);
+      let stderr = "";
+      child.stderr.on("data", chunk => { stderr += chunk; });
+      child.on("close", code => resolve({ code, stderr }));
+    });
+    assert.equal(result.code, 0, result.stderr);
+    const identities = JSON.parse(await readFile(path.join(tempDir, "config", "price-address-identities.json"), "utf8"));
+    assert.equal(identities.complexes["1"], undefined);
+    assert.deepEqual(identities.complexes["2"], ["테스트동|2", "테스트동|3"]);
+    assert.equal(identities.complexes["3"], undefined);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("apartment areas keep every whole-square-meter group from 59 through 120", () => {
   assert.equal(areaKey(58.99), null);
   assert.equal(areaKey(59.8), "59");
