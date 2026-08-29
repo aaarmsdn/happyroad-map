@@ -23,6 +23,13 @@ export function unmatchedNameReason(exactIds, aliasIds) {
   return exactIds.length || aliasIds.length ? "region_mismatch" : "name_not_found";
 }
 
+export function addressIdentityKey(regionCode, legalDong, jibun) {
+  const region = String(regionCode || "").trim();
+  const dong = String(legalDong || "").normalize("NFKC").trim().replace(/\s+/g, " ");
+  const lot = String(jibun || "").normalize("NFKC").trim().replace(/\d+/g, value => String(Number(value)));
+  return /^\d{5}$/.test(region) && dong && lot ? `${region}|${dong}|${lot}` : null;
+}
+
 export function xmlValue(item, tag) {
   const match = item.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`));
   return match?.[1]?.trim()

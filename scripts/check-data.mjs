@@ -4,15 +4,17 @@ import { fileURLToPath } from "node:url";
 import { areaRange, isCanonicalAreaKey } from "../public/area-data.js";
 import { priceRecordForDisplay } from "../public/filter-data.js";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
+import { addressIdentityKey } from "./price-refresh-lib.mjs";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = path.join(projectDir, "public", "data");
-const [apartments, prices, schools, boundaries, snapshotProvenance] = await Promise.all([
+const [apartments, prices, schools, boundaries, snapshotProvenance, addressIdentities] = await Promise.all([
   readFile(path.join(dataDir, "apartments.json"), "utf8").then(JSON.parse),
   readFile(path.join(dataDir, "prices.json"), "utf8").then(JSON.parse),
   readFile(path.join(dataDir, "schools.json"), "utf8").then(JSON.parse),
   readFile(path.join(projectDir, "config", "sgg.json"), "utf8").then(JSON.parse),
-  readFile(path.join(projectDir, "config", "price-snapshot.json"), "utf8").then(JSON.parse)
+  readFile(path.join(projectDir, "config", "price-snapshot.json"), "utf8").then(JSON.parse),
+  readFile(path.join(projectDir, "config", "price-address-identities.json"), "utf8").then(JSON.parse)
 ]);
 
 if (!Array.isArray(apartments.complexes) || apartments.complexes.length < 1) throw new Error("No apartment complexes");
@@ -29,6 +31,14 @@ if (apartments.complexes.some(complex => "listings" in complex)) throw new Error
 if (Object.values(prices.complexes).some(record => "naverMarker" in record || "trends" in record)) throw new Error("Third-party price snapshots must not be committed");
 if (JSON.stringify(prices).toLowerCase().includes("naver")) throw new Error("Third-party price provenance must not be committed");
 const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
+const invalidAddressIdentities = Object.entries(addressIdentities.complexes || {}).filter(([complexId, identities]) => {
+  const complex = complexById.get(complexId);
+  return !complex || !Array.isArray(identities) || !identities.length || identities.some(identity => {
+    const [legalDong, jibun, extra] = String(identity).split("|");
+    return extra || !addressIdentityKey(complex.regionCode, legalDong, jibun);
+  });
+});
+if (invalidAddressIdentities.length || !/^[a-f0-9]{64}$/.test(addressIdentities.source?.sha256 || "")) throw new Error("Apartment address identity data is invalid");
 const hiddenPrices = Object.entries(prices.complexes).filter(([complexId, record]) =>
   record.matchStatus === "matched" && Object.values(record.areas || {}).some(area => Number(area?.median) > 0)
     && priceRecordForDisplay(prices, complexId, complexById.get(complexId)?.regionCode) !== record

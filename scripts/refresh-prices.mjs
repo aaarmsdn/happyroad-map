@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
 import { APARTMENT_AREA_RANGES, areaKey, areaTagsForValues } from "../public/area-data.js";
 
@@ -36,11 +36,13 @@ const apartmentPath = path.join(projectDir, "public", "data", "apartments.json")
 const pricePath = path.join(projectDir, "public", "data", "prices.json");
 const boundaryPath = path.join(projectDir, "config", "sgg.json");
 const aliasPath = path.join(projectDir, "config", "price-name-aliases.json");
-const [apartments, prices, boundaries, nameAliases] = await Promise.all([
+const addressIdentityPath = path.join(projectDir, "config", "price-address-identities.json");
+const [apartments, prices, boundaries, nameAliases, addressIdentities] = await Promise.all([
   readFile(apartmentPath, "utf8").then(JSON.parse),
   readFile(pricePath, "utf8").then(JSON.parse),
   readFile(boundaryPath, "utf8").then(JSON.parse),
-  readFile(aliasPath, "utf8").then(JSON.parse)
+  readFile(aliasPath, "utf8").then(JSON.parse),
+  readFile(addressIdentityPath, "utf8").then(JSON.parse)
 ]);
 
 const districts = prepareDistricts(boundaries);
@@ -76,6 +78,27 @@ for (const [complexId, aliases] of Object.entries(nameAliases)) {
     idsByAlias.get(name).push(complexId);
   }
 }
+const idsByAddress = new Map();
+const addressesByComplex = new Map();
+for (const [complexId, identities] of Object.entries(addressIdentities.complexes || {})) {
+  if (!complexById.has(complexId) || !Array.isArray(identities) || !identities.length) throw new Error(`Invalid price address identity config for complex ${complexId}.`);
+  const keys = new Set();
+  for (const identity of identities) {
+    const [legalDong, jibun, extra] = String(identity).split("|");
+    const key = !extra && addressIdentityKey(regionByComplex.get(complexId), legalDong, jibun);
+    if (!key) throw new Error(`Invalid price address identity for complex ${complexId}: ${identity}`);
+    keys.add(key);
+    if (!idsByAddress.has(key)) idsByAddress.set(key, []);
+    idsByAddress.get(key).push(complexId);
+  }
+  addressesByComplex.set(complexId, keys);
+}
+const idsForTradeAddress = trade => idsByAddress.get(addressIdentityKey(trade.regionCode, trade.legalDong, trade.jibun)) || [];
+const eligibleIdsFor = (ids, trade) => {
+  const tradeKey = addressIdentityKey(trade.regionCode, trade.legalDong, trade.jibun);
+  if (!tradeKey) return ids;
+  return ids.filter(id => !addressesByComplex.has(id) || addressesByComplex.get(id).has(tradeKey));
+};
 
 const trades = [];
 for (const regionCode of regionCodes) {
@@ -94,8 +117,8 @@ for (const trade of targetTrades) {
   const normalizedTradeName = normalizeName(trade.name);
   const cacheKey = `${trade.regionCode}:${normalizedTradeName}`;
   if (inferredIdsByTradeName.has(cacheKey)) continue;
-  const exactIds = (idsByName.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
-  const aliasIds = (idsByAlias.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode);
+  const exactIds = eligibleIdsFor((idsByName.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode), trade);
+  const aliasIds = eligibleIdsFor((idsByAlias.get(normalizedTradeName) || []).filter(id => regionByComplex.get(id) === trade.regionCode), trade);
   const configuredIds = exactIds.length ? exactIds : aliasIds;
   if (configuredIds.length) {
     if (configuredIds.length === 1) {
@@ -111,7 +134,7 @@ for (const trade of targetTrades) {
     return Math.min(tradeName.length, complexName.length) >= 4
       && numberSignature(complex.name) === tradeNumbers
       && (tradeName.includes(complexName) || complexName.includes(tradeName));
-  });
+  }).filter(complex => eligibleIdsFor([complex.id], trade).length);
   if (candidates.length > 1 && trade.buildYear) {
     const sameBuildYear = candidates.filter(complex => Number(String(complex.completed || "").slice(0, 4)) === trade.buildYear);
     if (sameBuildYear.length === 1) candidates = sameBuildYear;
@@ -135,8 +158,10 @@ const grouped = new Map();
 let skippedAmbiguous = 0;
 let skippedNoName = 0;
 let skippedRegionMismatch = 0;
+let skippedAddressMismatch = 0;
 let matchedByAlias = 0;
 let matchedByUniqueContainment = 0;
+let matchedByAddress = 0;
 const unmatchedOfficialTrades = new Map();
 const rememberUnmatched = (trade, reason) => {
   const key = [trade.regionCode, trade.name, trade.legalDong, trade.jibun, trade.roadName, trade.roadMain, trade.roadSub, trade.buildYear].join("|");
@@ -157,15 +182,18 @@ for (const trade of targetTrades) {
   const band = trade.band;
   const ids = idsByName.get(normalizeName(trade.name)) || [];
   const aliasIds = idsByAlias.get(normalizeName(trade.name)) || [];
-  let regionIds = ids.filter(id => regionByComplex.get(id) === trade.regionCode);
-  let matchMethod = "normalized_name_and_lawd_cd_from_boundary";
+  const directAddressIds = idsForTradeAddress(trade);
+  let regionIds = directAddressIds.length === 1
+    ? directAddressIds
+    : eligibleIdsFor(ids.filter(id => regionByComplex.get(id) === trade.regionCode), trade);
+  let matchMethod = directAddressIds.length === 1 ? "official_address_and_lawd_cd" : "normalized_name_and_lawd_cd_from_boundary";
   if (!regionIds.length) {
-    regionIds = aliasIds.filter(id => regionByComplex.get(id) === trade.regionCode);
+    regionIds = eligibleIdsFor(aliasIds.filter(id => regionByComplex.get(id) === trade.regionCode), trade);
     if (regionIds.length) matchMethod = "configured_alias_and_lawd_cd_from_boundary";
   }
   if (!regionIds.length) {
     const cacheKey = `${trade.regionCode}:${normalizeName(trade.name)}`;
-    regionIds = inferredIdsByTradeName.get(cacheKey) || [];
+    regionIds = eligibleIdsFor(inferredIdsByTradeName.get(cacheKey) || [], trade);
     if (regionIds.length) matchMethod = "unique_containment_name_and_lawd_cd_from_boundary";
     else if (collidingInferredKeys.has(cacheKey)) {
       skippedAmbiguous += 1;
@@ -174,6 +202,13 @@ for (const trade of targetTrades) {
     }
   }
   if (!regionIds.length) {
+    const tradeKey = addressIdentityKey(trade.regionCode, trade.legalDong, trade.jibun);
+    const configuredNameIds = [...ids, ...aliasIds].filter(id => regionByComplex.get(id) === trade.regionCode && addressesByComplex.has(id));
+    if (tradeKey && configuredNameIds.length) {
+      skippedAddressMismatch += 1;
+      rememberUnmatched(trade, "address_mismatch");
+      continue;
+    }
     if (ids.length) {
       skippedRegionMismatch += 1;
     } else {
@@ -189,6 +224,7 @@ for (const trade of targetTrades) {
   }
   if (matchMethod === "configured_alias_and_lawd_cd_from_boundary") matchedByAlias += 1;
   if (matchMethod === "unique_containment_name_and_lawd_cd_from_boundary") matchedByUniqueContainment += 1;
+  if (matchMethod === "official_address_and_lawd_cd") matchedByAddress += 1;
   if (!grouped.has(regionIds[0])) grouped.set(regionIds[0], []);
   grouped.get(regionIds[0]).push({ ...trade, band, matchMethod });
 }
@@ -213,11 +249,13 @@ for (const [complexId, complexTrades] of grouped) {
   const record = prices.complexes[complexId] || {};
   record.matchStatus = "matched";
   const matchMethods = new Set(complexTrades.map(trade => trade.matchMethod));
-  record.matchMethod = matchMethods.has("configured_alias_and_lawd_cd_from_boundary")
-    ? "configured_alias_and_lawd_cd_from_boundary"
-    : matchMethods.has("unique_containment_name_and_lawd_cd_from_boundary")
-      ? "unique_containment_name_and_lawd_cd_from_boundary"
-      : "normalized_name_and_lawd_cd_from_boundary";
+  record.matchMethod = matchMethods.has("official_address_and_lawd_cd")
+    ? "official_address_and_lawd_cd"
+    : matchMethods.has("configured_alias_and_lawd_cd_from_boundary")
+      ? "configured_alias_and_lawd_cd_from_boundary"
+      : matchMethods.has("unique_containment_name_and_lawd_cd_from_boundary")
+        ? "unique_containment_name_and_lawd_cd_from_boundary"
+        : "normalized_name_and_lawd_cd_from_boundary";
   record.matchRegionCode = complexTrades[0].regionCode;
   record.matchedTradeCount = complexTrades.length;
   record.latestTradeDate = complexTrades.map(trade => trade.date).sort().at(-1);
@@ -260,8 +298,10 @@ prices.refresh = {
   skippedNoName,
   skippedRegionMismatch,
   skippedAmbiguous,
+  skippedAddressMismatch,
   matchedByAlias,
   matchedByUniqueContainment,
+  matchedByAddress,
   unmatchedOfficialTrades: [...unmatchedOfficialTrades.values()].sort((a, b) => a.regionCode.localeCompare(b.regionCode) || a.officialName.localeCompare(b.officialName, "ko"))
 };
 apartments.areaTagsGeneratedAt = generatedAt;

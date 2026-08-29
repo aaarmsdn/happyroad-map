@@ -8,6 +8,7 @@ on:
       - "scripts/price-refresh-lib.mjs"
       - "public/area-data.js"
       - "config/price-name-aliases.json"
+      - "config/price-address-identities.json"
       - ".github/workflows/refresh-prices.yml"
   schedule:
     - cron: "17 19 * * *"
