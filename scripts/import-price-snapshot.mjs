@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { APARTMENT_AREA_RANGES, areaTagsForValues } from "../public/area-data.js";
+import { APARTMENT_AREA_RANGES, areaKeysForSelection, areaTagsForValues } from "../public/area-data.js";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -30,15 +30,14 @@ const [apartments, prices] = await Promise.all([
   readFile(apartmentPath, "utf8").then(JSON.parse),
   readFile(pricePath, "utf8").then(JSON.parse)
 ]);
-const bands = ["59", "84", "102", "115"];
 let updatedComplexes = 0;
 
 for (const complex of apartments.complexes) {
   const source = snapshot.priceByComplex[complex.id];
   if (source?.matchStatus !== "matched") continue;
-  const areas = Object.fromEntries(bands.map(band => [band, source.areas?.[band] || { count: 0, min: null, median: null, max: null }]));
-  const observed = bands.filter(band => Number(areas[band].count) > 0);
+  const observed = areaKeysForSelection(source.areas);
   if (!observed.length) continue;
+  const areas = Object.fromEntries(observed.map(area => [area, source.areas[area]]));
   complex.areaTags = areaTagsForValues([...(complex.areaTags || []), ...observed]);
   prices.complexes[complex.id] = {
     matchStatus: "snapshot",
