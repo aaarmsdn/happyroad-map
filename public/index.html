@@ -12,20 +12,13 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/app-icon.png">
   <link rel="stylesheet" href="./vendor/leaflet.css">
-  <link rel="stylesheet" href="./styles.css?v=44">
+  <link rel="stylesheet" href="./styles.css?v=45">
 </head>
 <body>
   <main class="app-shell">
     <div id="map" aria-label="셔틀과 아파트 지도"></div>
 
     <header class="app-bar">
-      <div class="brand-block">
-        <img src="./icons/app-icon.png" alt="" class="brand-icon">
-        <div>
-          <h1>하이로드</h1>
-          <p id="dataFreshness">데이터 불러오는 중</p>
-        </div>
-      </div>
       <div class="app-actions">
         <button class="commute-launch" id="commuteButton" type="button" aria-label="길찾기" title="길찾기">
           <i data-lucide="navigation"></i>
@@ -95,6 +88,7 @@
           <span><b>정류장 표시</b><small id="stopCount">0개</small></span>
           <input id="showStops" type="checkbox" checked>
         </label>
+        <p class="data-freshness" id="shuttleFreshness">셔틀 데이터 업데이트 확인 중</p>
       </div>
 
       <div class="filter-view" data-view="apartment">
@@ -152,6 +146,7 @@
             <button class="segment" type="button" aria-pressed="false" data-apartment-color="none">단색</button>
           </div>
         </div>
+        <p class="data-freshness" id="apartmentFreshness">가격 데이터 업데이트 확인 중</p>
       </div>
 
       <div class="panel-footer">
@@ -223,6 +218,6 @@
   <script src="./vendor/leaflet.js"></script>
   <script src="./data/shuttle-data.js"></script>
   <script src="./data/shuttle-time-estimates.js"></script>
-  <script type="module" src="./app-main.js?v=151"></script>
+  <script type="module" src="./app-main.js?v=152"></script>
 </body>
 </html>

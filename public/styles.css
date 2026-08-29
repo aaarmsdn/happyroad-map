@@ -39,13 +39,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   position: absolute;
   z-index: 900;
   top: max(12px, env(safe-area-inset-top));
-  left: 12px;
+  left: auto;
   right: 12px;
+  width: max-content;
   height: 58px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 7px 8px 7px 10px;
+  justify-content: flex-end;
+  padding: 7px 8px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(220, 226, 229, 0.9);
   border-radius: 8px;
@@ -53,10 +54,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   backdrop-filter: blur(12px);
 }
 
-.brand-block { display: flex; align-items: center; min-width: 0; gap: 9px; }
-.brand-icon { width: 40px; height: 40px; border-radius: 7px; object-fit: cover; }
-.brand-block h1 { margin: 0; font-size: 18px; line-height: 1.1; color: var(--ink); }
-.brand-block p { margin: 4px 0 0; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-actions { display: flex; gap: 5px; }
 .icon-button {
   width: 40px;
@@ -110,6 +107,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .segment.active { color: var(--ink); background: white; box-shadow: 0 1px 5px rgba(30, 41, 50, 0.12); }
 .filter-view { display: none; gap: 12px; }
 .filter-view.active { display: grid; }
+.data-freshness { margin: 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--text-muted); font-size: 11px; }
 .filter-section { display: grid; gap: 7px; }
 .section-label, .field > span:first-child { font-size: 12px; font-weight: 700; color: #52616a; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -378,8 +376,6 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 @media (max-width: 859px) {
   .mobile-only { display: inline-grid; }
   .app-bar { height: 58px; padding-top: 5px; padding-bottom: 5px; }
-  .brand-icon { width: 36px; height: 36px; }
-  .brand-block h1 { font-size: 16px; }
   .app-actions .icon-button { width: 44px; height: 44px; }
   .app-actions .commute-launch { height: 44px; }
   .control-panel {
@@ -415,10 +411,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 @media (max-width: 390px) {
   :root { font-size: 14px; }
-  .app-bar { top: max(7px, env(safe-area-inset-top)); left: 7px; right: 7px; padding-left: 7px; }
-  .brand-block p { max-width: 128px; }
-  .brand-icon { width: 34px; height: 34px; }
-  .brand-block p { display: none; }
+  .app-bar { top: max(7px, env(safe-area-inset-top)); left: auto; right: 7px; }
   .commute-launch { padding: 0 8px; }
   .route-item { grid-template-columns: minmax(0, 1fr) auto; }
   .route-timing { min-width: 112px; }

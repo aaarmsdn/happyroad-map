@@ -64,15 +64,15 @@ function areaMetrics(record, selectedArea, selectedMetric) {
   const available = ordered.filter(area => Number(record?.areas?.[area]?.count) > 0);
   const overallAmount = transactionPrice(record, metric);
   const overallPerPyeong = Number(record?.[`${metric}PerPyeong`]);
-  if (!available.length && selectedArea === "전체" && (overallAmount || overallPerPyeong > 0)) {
-    const values = [overallAmount ? formatPrice(overallAmount) : "", overallPerPyeong > 0 ? `평당 ${overallPerPyeong.toLocaleString("ko-KR")}만` : ""].filter(Boolean).join(" · ");
-    return `<div class="price-list"><div class="price-row"><b>전체 면적</b><span>${values}</span><small>${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건 · 대상 면적 외 거래 포함</small></div></div>`;
-  }
+  const overallValues = [overallAmount ? formatPrice(overallAmount) : "", overallPerPyeong > 0 ? `평당 ${overallPerPyeong.toLocaleString("ko-KR")}만` : ""].filter(Boolean).join(" · ");
+  const overallRow = selectedArea === "전체" && overallValues
+    ? `<div class="price-row price-overall"><b>전체 면적</b><span>${overallValues}</span><small>${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건 · 대상 면적 외 거래 포함</small></div>` : "";
+  if (!available.length && overallRow) return `<div class="price-list">${overallRow}</div>`;
   if (!available.length && selectedArea === "전체" && Number(record?.matchedTradeCount) > 0) {
     return `<p class="empty-note">${priceMetricLabels[metric]} 갱신 대기 · 최근 거래 ${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건</p>`;
   }
   if (!available.length) return `<p class="empty-note">선택 면적의 최근 실거래가가 없습니다.</p>`;
-  return `<div class="price-list">${available.map(area => {
+  return `<div class="price-list">${overallRow}${available.map(area => {
     const data = record.areas[area];
     const amount = transactionPrice(data, metric);
     const perPyeong = transactionPricePerPyeong(data, area, metric);

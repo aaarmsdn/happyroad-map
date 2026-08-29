@@ -25,6 +25,13 @@ test("public app metadata does not identify a specific employer", async () => {
   assert.doesNotMatch(`${html}\n${manifest}\n${readme}\n${packageJson}`, /sk\s*(?:하이닉스|hynix)|hynix/i);
 });
 
+test("header omits branding while each filter owns its update date", async () => {
+  const html = await read("public/index.html");
+  assert.doesNotMatch(html, /class="brand-block"|id="dataFreshness"/);
+  assert.match(html, /data-view="shuttle"[\s\S]*id="shuttleFreshness"/);
+  assert.match(html, /data-view="apartment"[\s\S]*id="apartmentFreshness"/);
+});
+
 test("stop details show shuttle duration and arrival time in both directions", () => {
   const html = stopDetailHtml({
     name: "성수역",
@@ -148,6 +155,22 @@ test("apartment details show only the available stop direction", () => {
   });
   assert.match(html, /direction-badge">퇴근<\/em>/);
   assert.doesNotMatch(html, /출퇴근|출근 -|퇴근 -|노선 없음/);
+});
+
+test("all-area apartment details expose the same overall maximum as the marker", () => {
+  const record = {
+    matchStatus: "matched", matchedTradeCount: 14, latestTradeDate: "20260701",
+    max: 640000, maxPerPyeong: 10383,
+    areas: {
+      "102": { count: 2, min: 236000, max: 250000, maxPerPyeong: 8596 },
+      "115": { count: 1, min: 269500, max: 269500, maxPerPyeong: 8080 }
+    }
+  };
+  const base = { complex: { name: "알파리움1단지", type: "아파트", households: 417, completed: "2015", externalUrl: "" }, relatedLinks: [], record };
+  const allAreas = apartmentDetailHtml({ ...base, selectedArea: "전체", priceMetric: "max" });
+  assert.match(allAreas, /전체 면적[\s\S]*64억원[\s\S]*14건/);
+  assert.match(allAreas, /102㎡[\s\S]*25억원/);
+  assert.doesNotMatch(apartmentDetailHtml({ ...base, selectedArea: "102", priceMetric: "max" }), /전체 면적|64억원/);
 });
 
 test("commute result UI exposes breakdown and concrete journey detail", () => {
