@@ -402,6 +402,12 @@ test("mobile browser regressions", { timeout: 60000 }, async t => {
     assert.match(await evaluate("document.querySelector('#detailPanel .detail-subtitle').textContent"), /평균값/);
     await evaluate("document.querySelector('[data-price-metric=min]').click(); true");
     assert.equal(await evaluate("JSON.parse(localStorage.getItem('happyroad.filters')).priceMetric"), "min");
+    await evaluate("document.querySelector('#detailCloseButton').click(); document.querySelector('[data-apartment-color=commute]').click(); true");
+    await waitFor(() => evaluate("Boolean(document.querySelector('.apartment-price-marker'))"));
+    assert.notEqual(await evaluate("document.querySelector('.apartment-price-marker').style.getPropertyValue('--marker-color')"), "#63717a");
+    await evaluate("document.querySelector('[data-apartment-color=none]').click(); true");
+    assert.equal(await evaluate("document.querySelector('.apartment-price-marker').style.getPropertyValue('--marker-color')"), "#f04438");
+    await evaluate("document.querySelector('[data-apartment-color=price]').click(); true");
     await cdp.call("Page.reload", { ignoreCache: true }, sessionId);
     await waitFor(() => evaluate("document.readyState === 'complete' && document.querySelector('[data-price-metric=min]')?.classList.contains('active')"));
     assert.equal(await evaluate("document.querySelector('[data-price-metric].active').dataset.priceMetric"), "min");
