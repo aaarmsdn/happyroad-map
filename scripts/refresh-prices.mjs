@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { addressIdentityKey, comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, comparableName, eligibleAddressIds, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { officialRegionCodeFor, prepareDistricts } from "./region-match.mjs";
 import { replaceFiles } from "./replace-files.mjs";
 import { APARTMENT_AREA_RANGES, areaKey, areaTagsForValues } from "../public/area-data.js";
@@ -97,8 +97,7 @@ for (const [complexId, identities] of Object.entries(addressIdentities.complexes
 const idsForTradeAddress = trade => idsByAddress.get(addressIdentityKey(trade.regionCode, trade.legalDong, trade.jibun)) || [];
 const eligibleIdsFor = (ids, trade) => {
   const tradeKey = addressIdentityKey(trade.regionCode, trade.legalDong, trade.jibun);
-  if (!tradeKey) return ids;
-  return ids.filter(id => !addressesByComplex.has(id) || addressesByComplex.get(id).has(tradeKey));
+  return eligibleAddressIds(ids, tradeKey, addressesByComplex);
 };
 
 const trades = [];

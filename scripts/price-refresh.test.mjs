@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { areaKey, areaRange, isCanonicalAreaKey } from "../public/area-data.js";
-import { addressIdentityKey, comparableName, parseTrades, summarize, uniqueParcelIdentity, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, comparableName, eligibleAddressIds, parseTrades, safeParcelRows, summarize, uniqueParcelIdentity, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { replaceFiles } from "./replace-files.mjs";
 
 test("paired file replacement restores both originals after a later publish fails", async () => {
@@ -68,6 +68,20 @@ test("coordinate parcel matching rejects a parcel shared by multiple official co
   const target = { id: "a", pnu: "1168010300100120000" };
   assert.equal(uniqueParcelIdentity([target], [target]), target);
   assert.equal(uniqueParcelIdentity([target], [target, { id: "b", pnu: target.pnu }]), null);
+});
+
+test("name matching rejects shared parcels unless a reviewed alias allows them", () => {
+  const first = { id: "a", pnu: "p" };
+  const rows = new Map([["p", [first, { id: "b", pnu: "p" }]]]);
+  assert.deepEqual(safeParcelRows([first], rows), []);
+  assert.deepEqual(safeParcelRows([first], rows, true), [first]);
+});
+
+test("parcel-configured complexes require a complete matching trade address", () => {
+  const addresses = new Map([["parcel", new Set(["11620|봉천동|1"])] ]);
+  assert.deepEqual(eligibleAddressIds(["parcel", "name-only"], null, addresses), ["name-only"]);
+  assert.deepEqual(eligibleAddressIds(["parcel"], "11620|봉천동|1", addresses), ["parcel"]);
+  assert.deepEqual(eligibleAddressIds(["parcel"], "11620|봉천동|2", addresses), []);
 });
 
 test("apartment areas keep every whole-square-meter group from 59 through 120", () => {

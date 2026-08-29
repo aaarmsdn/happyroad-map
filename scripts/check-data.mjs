@@ -44,8 +44,11 @@ const addressIdentityValues = Object.entries(addressIdentities.complexes || {}).
 );
 if (new Set(addressIdentityValues).size !== addressIdentityValues.length) throw new Error("Apartment address identities must belong to one complex");
 const staleAddressPrices = Object.entries(prices.complexes).filter(([complexId, record]) => {
-  if (record.matchStatus !== "matched" || record.matchMethod !== "official_address_and_lawd_cd") return false;
-  const configuredAddresses = new Set((addressIdentities.complexes?.[complexId] || []).map(identity => identity.replace("|", " ")));
+  if (record.matchStatus !== "matched") return false;
+  const identities = addressIdentities.complexes?.[complexId] || [];
+  if (!identities.length) return false;
+  if (record.matchMethod !== "official_address_and_lawd_cd") return true;
+  const configuredAddresses = new Set(identities.map(identity => identity.replace("|", " ")));
   return (record.matchedOfficialAddresses || []).some(address => !configuredAddresses.has(address));
 });
 if (staleAddressPrices.length) throw new Error(`${staleAddressPrices.length} priced records use stale apartment parcel identities`);

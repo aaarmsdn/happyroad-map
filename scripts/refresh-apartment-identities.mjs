@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { addressIdentityKey, normalizeName, uniqueParcelIdentity } from "./price-refresh-lib.mjs";
+import { addressIdentityKey, normalizeName, safeParcelRows, uniqueParcelIdentity } from "./price-refresh-lib.mjs";
 import { replaceFiles } from "./replace-files.mjs";
 
 const sourceUrl = "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003521525&fileDetailSn=1&insertDataPrcus=N";
@@ -86,7 +86,7 @@ const rowsByRegion = new Map();
 const rowsByPnu = new Map();
 for (const line of lines) {
   const values = parseCsvLine(line);
-  if (values.length !== 10 || values[6] !== "1" || !/^\d{19}$/.test(values[1])) continue;
+  if (values.length !== 10 || !/^\d{19}$/.test(values[1])) continue;
   const row = {
     id: values[0],
     pnu: values[1],
@@ -96,16 +96,18 @@ for (const line of lines) {
     households: Number(values[8]) || 0,
     buildYear: Number(values[9].slice(0, 4)) || 0
   };
+  if (!rowsByPnu.has(row.pnu)) rowsByPnu.set(row.pnu, []);
+  rowsByPnu.get(row.pnu).push(row);
+  if (values[6] !== "1") continue;
   const regionCode = row.pnu.slice(0, 5);
   if (!rowsByRegion.has(regionCode)) rowsByRegion.set(regionCode, []);
   rowsByRegion.get(regionCode).push(row);
-  if (!rowsByPnu.has(row.pnu)) rowsByPnu.set(row.pnu, []);
-  rowsByPnu.get(row.pnu).push(row);
 }
 
-const [apartments, aliases] = await Promise.all([
+const [apartments, aliases, previousIdentities] = await Promise.all([
   readFile(path.join(projectDir, "public", "data", "apartments.json"), "utf8").then(JSON.parse),
-  readFile(path.join(projectDir, "config", "price-name-aliases.json"), "utf8").then(JSON.parse)
+  readFile(path.join(projectDir, "config", "price-name-aliases.json"), "utf8").then(JSON.parse),
+  readFile(path.join(projectDir, "config", "price-address-identities.json"), "utf8").then(JSON.parse)
 ]);
 const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
 const complexes = {};
@@ -152,8 +154,7 @@ for (const complex of apartments.complexes) {
       method = "contained_name_aggregate_households_year";
     }
   }
-  const chosenIds = new Set(chosen.map(row => row.id));
-  const safeRows = chosen.filter(row => rowsByPnu.get(row.pnu).every(candidate => chosenIds.has(candidate.id)));
+  const safeRows = safeParcelRows(chosen, rowsByPnu, method === "reviewed_alias");
   const identities = [...new Set(safeRows.map(apartmentIdentity).filter(identity => {
     const [legalDong, jibun] = String(identity || "").split("|");
     return addressIdentityKey(complex.regionCode, legalDong, jibun);
@@ -167,6 +168,15 @@ for (const complex of apartments.complexes) {
   } else {
     noCandidate += 1;
     unresolvedReasons.set(complex.id, "noCandidate");
+  }
+}
+
+for (const complex of apartments.complexes.filter(item => !complexes[item.id] && !(aliases[item.id] || []).length)) {
+  const identities = previousIdentities.complexes?.[complex.id] || [];
+  const rows = identities.map(identity => (rowsByRegion.get(complex.regionCode) || []).filter(row => apartmentIdentity(row) === identity));
+  if (identities.length && rows.every(matches => matches.length === 1 && rowsByPnu.get(matches[0].pnu)?.length === 1)) {
+    complexes[complex.id] = identities;
+    methodByComplex.set(complex.id, "existing_unique_parcel");
   }
 }
 
@@ -207,6 +217,12 @@ for (const [complexId, identities] of Object.entries(complexes)) {
   if (uniqueIdentities.length) complexes[complexId] = uniqueIdentities;
   else delete complexes[complexId];
 }
+const unsafeSharedParcels = Object.entries(complexes).filter(([complexId, identities]) => {
+  if (methodByComplex.get(complexId) === "reviewed_alias") return false;
+  const rows = rowsByRegion.get(complexById.get(complexId)?.regionCode) || [];
+  return identities.some(identity => rows.some(row => apartmentIdentity(row) === identity && rowsByPnu.get(row.pnu)?.length > 1));
+});
+if (unsafeSharedParcels.length) throw new Error(`${unsafeSharedParcels.length} unreviewed shared apartment parcels were rejected: ${unsafeSharedParcels.slice(0, 10).map(([id]) => id).join(", ")}`);
 const methods = {};
 for (const complexId of Object.keys(complexes)) {
   const method = methodByComplex.get(complexId);

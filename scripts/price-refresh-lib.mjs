@@ -34,6 +34,14 @@ export function uniqueParcelIdentity(matches, parcelRows) {
   return matches.length === 1 && parcelRows.length === 1 ? matches[0] : null;
 }
 
+export function safeParcelRows(chosen, rowsByPnu, allowShared = false) {
+  return chosen.filter(row => allowShared || rowsByPnu.get(row.pnu)?.length === 1);
+}
+
+export function eligibleAddressIds(ids, tradeKey, addressesByComplex) {
+  return ids.filter(id => !addressesByComplex.has(id) || Boolean(tradeKey && addressesByComplex.get(id).has(tradeKey)));
+}
+
 export function xmlValue(item, tag) {
   const match = item.match(new RegExp(`<${tag}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${tag}>`));
   return match?.[1]?.trim()
