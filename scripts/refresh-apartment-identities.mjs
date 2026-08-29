@@ -56,8 +56,14 @@ async function reverseParcelIdentity(worker, complex) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const response = await fetch(worker, { headers: { origin: "https://aaarmsdn.github.io" }, signal: AbortSignal.timeout(10000) });
-      if (response.ok) return String((await response.json()).parcelIdentity || "");
-      if (response.status !== 429 && response.status < 500) return "";
+      if (response.ok) {
+        const payload = await response.json();
+        return {
+          identity: String(payload.parcelIdentity || ""),
+          regionCode: /^\d{5}$/.test(payload.regionCode || "") ? payload.regionCode : complex.regionCode
+        };
+      }
+      if (response.status !== 429 && response.status < 500) return { identity: "", regionCode: complex.regionCode };
     } catch {}
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
@@ -167,18 +173,19 @@ if (addressWorkerUrl) {
   const worker = new URL(addressWorkerUrl);
   let failedLookups = 0;
   for (const complex of apartments.complexes.filter(item => !complexes[item.id] && !(aliases[item.id] || []).length)) {
-    const identity = await reverseParcelIdentity(worker, complex);
-    if (identity === null) {
+    const location = await reverseParcelIdentity(worker, complex);
+    if (location === null) {
       failedLookups += 1;
-    } else if (identity) {
-      const matches = (rowsByRegion.get(complex.regionCode) || []).filter(row => apartmentIdentity(row) === identity);
+    } else if (location.identity) {
+      const matches = (rowsByRegion.get(location.regionCode) || []).filter(row => apartmentIdentity(row) === location.identity);
       const pnu = matches.length ? matches[0].pnu : null;
       if (pnu && uniqueParcelIdentity(matches, rowsByPnu.get(pnu))) {
-        complexes[complex.id] = [identity];
+        complex.regionCode = location.regionCode;
+        complexes[complex.id] = [location.identity];
         methodByComplex.set(complex.id, "coordinate_parcel");
       }
     }
-    await new Promise(resolve => setTimeout(resolve, 250));
+    await new Promise(resolve => setTimeout(resolve, 300));
   }
   if (failedLookups) throw new Error(`${failedLookups} apartment parcel lookups failed; identity data was not replaced.`);
 }
@@ -218,5 +225,8 @@ const output = {
   stats: { matchedComplexes: Object.keys(complexes).length, ambiguous, noCandidate, duplicateIdentities: duplicateIdentities.size, methods },
   complexes
 };
-await writeFile(path.join(projectDir, "config", "price-address-identities.json"), JSON.stringify(output));
+await Promise.all([
+  writeFile(path.join(projectDir, "config", "price-address-identities.json"), JSON.stringify(output)),
+  writeFile(path.join(projectDir, "public", "data", "apartments.json"), JSON.stringify(apartments))
+]);
 console.log(JSON.stringify(output.stats, null, 2));

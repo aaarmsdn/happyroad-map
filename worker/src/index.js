@@ -169,8 +169,16 @@ export async function handleRequest(request, env, fetcher = fetch) {
       const parcelIdentity = parcel?.region_3depth_name && lot
         ? `${parcel.region_3depth_name}|${parcel.mountain_yn === "Y" ? "산" : ""}${lot}`
         : null;
+      let regionCode = /^\d{10}$/.test(parcel?.b_code || "") ? String(parcel.b_code).slice(0, 5) : null;
+      if (!regionCode) {
+        const regionUpstream = new URL("https://dapi.kakao.com/v2/local/geo/coord2regioncode.json");
+        regionUpstream.searchParams.set("x", point.lng);
+        regionUpstream.searchParams.set("y", point.lat);
+        const legalRegion = ((await kakao(regionUpstream, env, fetcher))?.documents || []).find(region => region.region_type === "B");
+        regionCode = /^\d{10}$/.test(legalRegion?.code || "") ? String(legalRegion.code).slice(0, 5) : null;
+      }
       return address || parcelIdentity
-        ? json({ ...(address ? { address } : {}), ...(parcelIdentity ? { parcelIdentity } : {}) }, 200, origin)
+        ? json({ ...(address ? { address } : {}), ...(parcelIdentity ? { parcelIdentity } : {}), ...(regionCode ? { regionCode } : {}) }, 200, origin)
         : json({ error: "address_not_found" }, 404, origin);
     }
     if (request.method === "POST" && url.pathname === "/routes") {

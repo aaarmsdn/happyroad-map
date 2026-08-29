@@ -72,7 +72,9 @@ const districts = prepareDistricts(boundaries);
 const regionCodes = apartments.complexes.map(complex => regionCodeFor(complex, districts));
 const unmappedComplexes = regionCodes.filter(code => !code);
 if (unmappedComplexes.length) throw new Error(`${unmappedComplexes.length} apartment complexes are outside configured district boundaries`);
-const mismatchedRegions = apartments.complexes.filter((complex, index) => complex.regionCode !== regionCodes[index]);
+const mismatchedRegions = apartments.complexes.filter((complex, index) =>
+  complex.regionCode !== regionCodes[index] && !(addressIdentities.complexes?.[complex.id] || []).length
+);
 if (mismatchedRegions.length) throw new Error(`${mismatchedRegions.length} apartment region codes differ from configured district boundaries`);
 
 console.log(JSON.stringify({
