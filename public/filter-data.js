@@ -1,5 +1,6 @@
 import { hourOf } from "./filter-logic.js?v=12";
 import { normalize } from "./ui-utils.js?v=10";
+import { areaTagMatches } from "./area-data.js?v=1";
 
 export function entryMatches(entry, state) {
   const query = normalize(state.routeQuery);
@@ -164,7 +165,7 @@ export function matchingApartmentLinks(links, state, stationDirections, complexB
     if (link.distanceKm > state.distance) continue;
     const complex = complexById.get(link.complexId);
     if (!complex || complex.households < state.households) continue;
-    if (state.area !== "전체" && !complex.areaTags.includes(state.area)) continue;
+    if (state.area !== "전체" && !areaTagMatches(complex.areaTags, state.area)) continue;
     if (!stationDirections.has(link.stationId)) continue;
     if (!linksByComplex.has(link.complexId)) linksByComplex.set(link.complexId, []);
     linksByComplex.get(link.complexId).push(link);
@@ -192,4 +193,4 @@ export function matchingApartmentLinks(links, state, stationDirections, complexB
   return result;
 }
 
-export { apartmentColor, overallTransactionPrice, overallTransactionPricePerPyeong, priceColor, priceFor, priceMetric, pricePerPyeong, pricePerPyeongFor, priceRecordForDisplay, transactionPrice, transactionPricePerPyeong } from "./price-data.js?v=2";
+export { apartmentColor, priceColor, priceFor, priceMetric, pricePerPyeong, pricePerPyeongFor, priceRecordForDisplay, representativeAreaPrice, transactionPrice, transactionPricePerPyeong } from "./price-data.js?v=3";

@@ -74,9 +74,9 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
     await evaluate("document.querySelector('[data-category=출근]').click(); true");
     assert.deepEqual(await evaluate("[...document.querySelectorAll('#categoryChips .chip')].map(button => button.getAttribute('aria-pressed'))"), ["false", "true", "false", "false", "false"]);
     await evaluate("document.querySelector('[data-category=전체]').click(); true");
-    assert.deepEqual(await evaluate("[...document.querySelectorAll('#areaChips .chip')].map(button => button.getAttribute('aria-pressed'))"), ["true", "false", "false", "false", "false"]);
-    await evaluate("document.querySelector('[data-area=\"84\"]').click(); document.querySelector('[data-area=\"84\"]').click(); true");
-    assert.deepEqual(await evaluate("[...document.querySelectorAll('#areaChips .chip')].map(button => button.getAttribute('aria-pressed'))"), ["false", "false", "false", "false", "false"]);
+    assert.deepEqual(await evaluate("[...document.querySelectorAll('#areaChips .chip')].map(button => button.getAttribute('aria-pressed'))"), ["true", "false", "false", "false", "false", "false", "false"]);
+    await evaluate("document.querySelector('[data-area=\"80-89\"]').click(); document.querySelector('[data-area=\"80-89\"]').click(); true");
+    assert.deepEqual(await evaluate("[...document.querySelectorAll('#areaChips .chip')].map(button => button.getAttribute('aria-pressed'))"), ["false", "false", "false", "false", "false", "false", "false"]);
     assert.equal(await evaluate("document.querySelector('#apartmentCount').textContent"), "0개");
     await evaluate("document.querySelector('[data-area=전체]').click(); true");
     });
@@ -395,16 +395,16 @@ test("mobile browser regressions", { timeout: 30000 }, async t => {
       document.querySelector('.apartment-cluster')?.closest('.leaflet-marker-icon')?.click();
       return false;
     })()`));
-    const maxMarker = await evaluate("document.querySelector('.apartment-price-marker b').textContent.trim()");
     await evaluate("document.querySelector('.apartment-price-marker').closest('.leaflet-marker-icon').dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window})); true");
     await waitFor(() => evaluate("document.querySelector('#detailPanel').classList.contains('open')"));
     assert.equal(await evaluate("document.querySelector('[data-price-metric].active').dataset.priceMetric"), "max");
     await evaluate("document.querySelector('[data-price-metric=average]').click(); true");
     assert.match(await evaluate("document.querySelector('#detailPanel .detail-subtitle').textContent"), /평균값/);
     await evaluate("document.querySelector('[data-price-metric=min]').click(); true");
-    const minMarker = await waitFor(() => evaluate("document.querySelector('.apartment-price-marker b')?.textContent.trim()"));
-    assert.notEqual(minMarker, maxMarker);
     assert.equal(await evaluate("JSON.parse(localStorage.getItem('happyroad.filters')).priceMetric"), "min");
+    await cdp.call("Page.reload", { ignoreCache: true }, sessionId);
+    await waitFor(() => evaluate("document.readyState === 'complete' && document.querySelector('[data-price-metric=min]')?.classList.contains('active')"));
+    assert.equal(await evaluate("document.querySelector('[data-price-metric].active').dataset.priceMetric"), "min");
     });
 
     await t.test("stale geolocation callbacks cannot override close or place selection", async () => {

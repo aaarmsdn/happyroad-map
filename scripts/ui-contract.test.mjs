@@ -161,7 +161,7 @@ test("apartment details show only the available stop direction", () => {
   assert.doesNotMatch(html, /출퇴근|출근 -|퇴근 -|노선 없음/);
 });
 
-test("all-area apartment details expose the same overall maximum as the marker", () => {
+test("all-area apartment details expose the same target-area maximum as the marker", () => {
   const record = {
     matchStatus: "matched", matchMethod: "unique_containment_name_and_lawd_cd_from_boundary", matchRegionCode: "41135",
     matchedTradeCount: 14, latestTradeDate: "20260701",
@@ -173,8 +173,9 @@ test("all-area apartment details expose the same overall maximum as the marker",
   };
   const base = { complex: { name: "알파리움1단지", type: "아파트", households: 417, completed: "2015", externalUrl: "" }, relatedLinks: [], record };
   const allAreas = apartmentDetailHtml({ ...base, selectedArea: "전체", priceMetric: "max" });
-  assert.equal(priceFor({ complexes: { "106922": record } }, { area: "전체", priceMetric: "max" }, "106922", "41135"), 640000);
-  assert.match(allAreas, /전체 면적[\s\S]*64억원[\s\S]*14건/);
+  assert.equal(priceFor({ complexes: { "106922": record } }, { area: "전체", priceMetric: "max" }, "106922", "41135"), 269500);
+  assert.match(allAreas, /대표 115㎡[\s\S]*26억 9,500만원[\s\S]*1건/);
+  assert.doesNotMatch(allAreas, /전체 면적|64억원/);
   assert.match(allAreas, /102㎡[\s\S]*25억원/);
   assert.match(allAreas, /115㎡[\s\S]*26억 9,500만원/);
   assert.doesNotMatch(apartmentDetailHtml({ ...base, selectedArea: "102", priceMetric: "max" }), /전체 면적|64억원/);
@@ -192,12 +193,8 @@ test("snapshot details use the same area fallback as the marker", () => {
     complex: { name: "단지", type: "아파트", households: 100, completed: "2000", externalUrl: "" },
     relatedLinks: [], record, selectedArea: "전체", priceMetric: "max"
   });
-  assert.match(detail, /전체 면적[\s\S]*11억 8,000만원/);
-  assert.match(detail, /58건 · 대상 면적 외 거래 포함/);
-  assert.doesNotMatch(apartmentDetailHtml({
-    complex: { name: "단지", type: "아파트", households: 100, completed: "2000", externalUrl: "" },
-    relatedLinks: [], record: { ...record, matchedTradeCount: 10 }, selectedArea: "전체", priceMetric: "max"
-  }), /대상 면적 외 거래 포함/);
+  assert.match(detail, /대표 84㎡[\s\S]*11억 8,000만원[\s\S]*10건/);
+  assert.doesNotMatch(detail, /전체 면적|대상 면적 외 거래 포함|58건/);
 });
 
 test("commute result UI exposes breakdown and concrete journey detail", () => {
@@ -240,6 +237,14 @@ test("apartment settings expose highest, average, and lowest price modes", async
   assert.match(html, /data-price-metric="max"[^>]*>최고값/);
   assert.match(html, /data-price-metric="average"[^>]*>평균값/);
   assert.match(html, /data-price-metric="min"[^>]*>최저값/);
+});
+
+test("apartment settings expose six contiguous area ranges", async () => {
+  const html = await read("public/index.html");
+  for (const [value, label] of [["59-69", "59~69㎡"], ["70-79", "70~79㎡"], ["80-89", "80~89㎡"], ["90-99", "90~99㎡"], ["100-109", "100~109㎡"], ["110-120", "110~120㎡"]]) {
+    assert.match(html, new RegExp(`data-area="${value}"[^>]*>${label}`));
+  }
+  assert.doesNotMatch(html, /data-area="(?:59|84|102|115)"/);
 });
 
 test("apartment settings expose price, commute, and plain color modes", async () => {

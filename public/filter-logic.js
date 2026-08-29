@@ -23,7 +23,7 @@ export function restoreFilters(state, saved) {
     if (typeof saved[key] === "string") state[key] = saved[key];
   }
   if (["전체", "출근", "퇴근", "기타셔틀", "사내셔틀"].includes(saved.category)) state.category = saved.category;
-  if (["", "전체", "59", "84", "102", "115"].includes(saved.area)) state.area = saved.area;
+  if (["", "전체", "59-69", "70-79", "80-89", "90-99", "100-109", "110-120"].includes(saved.area)) state.area = saved.area;
   if (["max", "average", "min"].includes(saved.priceMetric)) state.priceMetric = saved.priceMetric;
   if (["price", "commute", "none"].includes(saved.apartmentColor)) state.apartmentColor = saved.apartmentColor;
   else if (saved.priceColors === false) state.apartmentColor = "none";

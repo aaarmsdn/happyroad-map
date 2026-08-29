@@ -26,7 +26,7 @@ test("apartment numeric metadata cannot inject executable HTML", () => {
   assert.equal(html.match(/&lt;img/g)?.length, 1);
 });
 
-test("apartment area keys cannot inject executable HTML", () => {
+test("nonstandard apartment area keys are ignored and cannot inject executable HTML", () => {
   const payload = '<img src=x onerror="alert(1)">';
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 100, completed: "2026", externalUrl: "" },
@@ -38,10 +38,11 @@ test("apartment area keys cannot inject executable HTML", () => {
     selectedArea: "전체"
   });
   assert.doesNotMatch(html, /<img/);
-  assert.match(html, /&lt;img/);
+  assert.doesNotMatch(html, /&lt;img/);
+  assert.match(html, /59~120㎡ 최근 실거래가가 없습니다/);
 });
 
-test("apartment details show overall per-pyeong prices when target areas have no trades", () => {
+test("apartment details ignore overall prices when target areas have no trades", () => {
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 325, completed: "2004", externalUrl: "" },
     relatedLinks: [],
@@ -52,9 +53,8 @@ test("apartment details show overall per-pyeong prices when target areas have no
     selectedArea: "전체",
     priceMetric: "average"
   });
-  assert.match(html, /전체 면적/);
-  assert.match(html, /평당 3,283만/);
-  assert.match(html, /24건 · 대상 면적 외 거래 포함/);
+  assert.match(html, /59~120㎡ 최근 실거래가가 없습니다/);
+  assert.doesNotMatch(html, /전체 면적|평당 3,283만|24건/);
 });
 
 test("legacy details mark unavailable arithmetic averages as pending", () => {
@@ -72,7 +72,7 @@ test("legacy details mark unavailable arithmetic averages as pending", () => {
   assert.doesNotMatch(html, /9억 5,000만원/);
 });
 
-test("legacy details distinguish nonstandard trades awaiting summaries", () => {
+test("legacy details ignore nonstandard trades", () => {
   const html = apartmentDetailHtml({
     complex: { name: "단지", type: "아파트", households: 325, completed: "2004", externalUrl: "" },
     relatedLinks: [],
@@ -83,9 +83,8 @@ test("legacy details distinguish nonstandard trades awaiting summaries", () => {
     selectedArea: "전체",
     priceMetric: "average"
   });
-  assert.match(html, /평균값 갱신 대기/);
-  assert.match(html, /최근 거래 19건/);
-  assert.doesNotMatch(html, /최근 실거래가가 없습니다/);
+  assert.match(html, /59~120㎡ 최근 실거래가가 없습니다/);
+  assert.doesNotMatch(html, /평균값 갱신 대기|최근 거래 19건/);
 });
 
 test("apartment details use the selected transaction price metric", () => {
@@ -114,6 +113,7 @@ test("price refresh preserves existing data on empty API results", async () => {
     copyFile(fileURLToPath(new URL("../scripts/refresh-prices.mjs", import.meta.url)), path.join(tempDir, "scripts", "refresh-prices.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/price-refresh-lib.mjs", import.meta.url)), path.join(tempDir, "scripts", "price-refresh-lib.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/region-match.mjs", import.meta.url)), path.join(tempDir, "scripts", "region-match.mjs")),
+    copyFile(fileURLToPath(new URL("../public/area-data.js", import.meta.url)), path.join(tempDir, "public", "area-data.js")),
     copyFile(fileURLToPath(new URL("../config/sgg.json", import.meta.url)), path.join(tempDir, "config", "sgg.json")),
     copyFile(fileURLToPath(new URL("../config/price-name-aliases.json", import.meta.url)), path.join(tempDir, "config", "price-name-aliases.json")),
     copyFile(fileURLToPath(new URL("../public/data/apartments.json", import.meta.url)), path.join(tempDir, "public", "data", "apartments.json")),
@@ -153,6 +153,7 @@ test("price refresh adds newly observed official unit sizes to apartment filters
     copyFile(fileURLToPath(new URL("../scripts/refresh-prices.mjs", import.meta.url)), path.join(tempDir, "scripts", "refresh-prices.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/price-refresh-lib.mjs", import.meta.url)), path.join(tempDir, "scripts", "price-refresh-lib.mjs")),
     copyFile(fileURLToPath(new URL("../scripts/region-match.mjs", import.meta.url)), path.join(tempDir, "scripts", "region-match.mjs")),
+    copyFile(fileURLToPath(new URL("../public/area-data.js", import.meta.url)), path.join(tempDir, "public", "area-data.js")),
     copyFile(fileURLToPath(new URL("../config/sgg.json", import.meta.url)), path.join(tempDir, "config", "sgg.json")),
     copyFile(fileURLToPath(new URL("../config/price-name-aliases.json", import.meta.url)), path.join(tempDir, "config", "price-name-aliases.json")),
     copyFile(fileURLToPath(new URL("../public/data/apartments.json", import.meta.url)), path.join(tempDir, "public", "data", "apartments.json")),
@@ -162,8 +163,8 @@ test("price refresh adds newly observed official unit sizes to apartment filters
   const apartmentFixture = JSON.parse(await readFile(apartmentPath, "utf8"));
   apartmentFixture.complexes.find(complex => complex.id === "8104").areaTags = ["102"];
   await writeFile(apartmentPath, JSON.stringify(apartmentFixture));
-  const preloadPath = path.join(tempDir, "one-molit-trade.mjs");
-  await writeFile(preloadPath, `globalThis.fetch = async () => new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>1</totalCount><items><item><aptNm>성수롯데캐슬파크</aptNm><excluUseAr>59.8</excluUseAr><dealAmount>150,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item></items></body></response>\`, { status: 200 });`);
+  const preloadPath = path.join(tempDir, "two-molit-trades.mjs");
+  await writeFile(preloadPath, `globalThis.fetch = async () => new Response(\`<response><header><resultCode>000</resultCode></header><body><totalCount>2</totalCount><items><item><aptNm>성수롯데캐슬파크</aptNm><excluUseAr>59.8</excluUseAr><dealAmount>150,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>1</dealDay></item><item><aptNm>성수롯데캐슬파크</aptNm><excluUseAr>76.4</excluUseAr><dealAmount>170,000</dealAmount><dealYear>2026</dealYear><dealMonth>8</dealMonth><dealDay>2</dealDay></item></items></body></response>\`, { status: 200 });`);
 
   try {
     const result = await new Promise(resolve => {
@@ -176,13 +177,15 @@ test("price refresh adds newly observed official unit sizes to apartment filters
     });
     assert.equal(result.code, 0, result.stderr);
     const apartments = JSON.parse(await readFile(apartmentPath, "utf8"));
-    assert.deepEqual(apartments.complexes.find(complex => complex.id === "8104").areaTags, ["59", "102"]);
+    assert.deepEqual(apartments.complexes.find(complex => complex.id === "8104").areaTags, ["59-69", "70-79", "100-109"]);
     assert.match(apartments.areaTagsGeneratedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.equal(apartments.stats.priceStatus, "official_api_refreshed");
-    assert.equal(apartments.stats.areaCounts["59"] > 0, true);
+    assert.equal(apartments.stats.areaCounts["59-69"] > 0, true);
 
     const pricePath = path.join(tempDir, "public", "data", "prices.json");
     const unsafePrices = JSON.parse(await readFile(pricePath, "utf8"));
+    assert.equal(unsafePrices.complexes["8104"].areas["59"].max, 150000);
+    assert.equal(unsafePrices.complexes["8104"].areas["76"].max, 170000);
     unsafePrices.complexes.unsafe = {
       matchStatus: "matched",
       matchMethod: "unique_containment_name_and_lawd_cd_from_boundary",

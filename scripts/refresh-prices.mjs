@@ -2,8 +2,9 @@ import { readFile, writeFile } from "node:fs/promises";
 import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { areaBand, comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
+import { comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
 import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
+import { APARTMENT_AREA_RANGES, areaKey, areaTagsForValues } from "../public/area-data.js";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const endpoint = "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev";
@@ -81,11 +82,15 @@ for (const regionCode of regionCodes) {
   for (const month of recentMonths(monthsCount)) trades.push(...await fetchMonth(endpoint, serviceKey, regionCode, month));
 }
 if (!trades.length) throw new Error("MOLIT returned no valid trades; existing prices were preserved.");
+const targetTrades = trades
+  .map(trade => ({ ...trade, band: areaKey(trade.area) }))
+  .filter(trade => trade.band);
+if (!targetTrades.length) throw new Error("MOLIT returned no trades from 59 through 120 square meters; existing prices were preserved.");
 
 const inferredIdsByTradeName = new Map();
 const claimedTradeNamesByComplex = new Map();
 // Multiple official names for one inferred complex require a reviewed explicit alias.
-for (const trade of trades) {
+for (const trade of targetTrades) {
   const normalizedTradeName = normalizeName(trade.name);
   const cacheKey = `${trade.regionCode}:${normalizedTradeName}`;
   if (inferredIdsByTradeName.has(cacheKey)) continue;
@@ -148,8 +153,8 @@ const rememberUnmatched = (trade, reason) => {
     count: 1
   });
 };
-for (const trade of trades) {
-  const band = areaBand(trade.area);
+for (const trade of targetTrades) {
+  const band = trade.band;
   const ids = idsByName.get(normalizeName(trade.name)) || [];
   const aliasIds = idsByAlias.get(normalizeName(trade.name)) || [];
   let regionIds = ids.filter(id => regionByComplex.get(id) === trade.regionCode);
@@ -199,7 +204,7 @@ for (const [complexId, record] of Object.entries(prices.complexes)) {
     matchedTradeCount: 0,
     latestTradeDate: null,
     source: "국토교통부 아파트 매매 실거래가 API",
-    areas: Object.fromEntries(["59", "84", "102", "115"].map(band => [band, summarize([])]))
+    areas: {}
   };
 }
 
@@ -229,11 +234,12 @@ for (const [complexId, complexTrades] of grouped) {
   record.averagePerPyeong = overall.averagePerPyeong;
   record.medianPerPyeong = overall.medianPerPyeong;
   record.maxPerPyeong = overall.maxPerPyeong;
-  record.areas = Object.fromEntries(["59", "84", "102", "115"].map(band => [band, summarize(complexTrades.filter(trade => trade.band === band))]));
+  const areaKeys = [...new Set(complexTrades.map(trade => trade.band))].sort((a, b) => Number(a) - Number(b));
+  record.areas = Object.fromEntries(areaKeys.map(band => [band, summarize(complexTrades.filter(trade => trade.band === band))]));
   prices.complexes[complexId] = record;
-  const observedAreas = Object.entries(record.areas).filter(([, area]) => area.count > 0).map(([band]) => band);
-  complex.areaTags = ["59", "84", "102", "115"].filter(band => complex.areaTags.includes(band) || observedAreas.includes(band));
+  complex.areaTags = areaTagsForValues([...(complex.areaTags || []), ...areaKeys]);
 }
+for (const complex of apartments.complexes) complex.areaTags = areaTagsForValues(complex.areaTags || []);
 if (Object.entries(prices.complexes).some(([complexId, record]) =>
   (refreshedRegions.has(record.matchRegionCode) || !complexById.has(complexId))
   && record.matchMethod === "unique_containment_name_and_lawd_cd_from_boundary"
@@ -248,6 +254,7 @@ prices.refresh = {
   regionCodes,
   months: monthsCount,
   fetchedTrades: trades.length,
+  targetAreaTrades: targetTrades.length,
   updatedComplexes: grouped.size,
   unmappedComplexes,
   skippedNoName,
@@ -259,8 +266,10 @@ prices.refresh = {
 };
 apartments.areaTagsGeneratedAt = generatedAt;
 apartments.source.areaTagSource = "국토교통부 아파트 매매 실거래가 API";
+apartments.source.areaFilter = "59_to_120_exact_integer_groups";
 apartments.stats.priceStatus = "official_api_refreshed";
-apartments.stats.areaCounts = Object.fromEntries(["59", "84", "102", "115"].map(band => [band, apartments.complexes.filter(complex => complex.areaTags.includes(band)).length]));
+apartments.stats.areaFilter = "59_to_120";
+apartments.stats.areaCounts = Object.fromEntries(APARTMENT_AREA_RANGES.map(([range]) => [range, apartments.complexes.filter(complex => complex.areaTags.includes(range)).length]));
 await Promise.all([
   writeFile(apartmentPath, JSON.stringify(apartments)),
   writeFile(pricePath, JSON.stringify(prices))

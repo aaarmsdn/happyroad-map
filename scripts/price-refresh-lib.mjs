@@ -98,12 +98,6 @@ export function summarize(trades) {
   };
 }
 
-export function areaBand(area) {
-  const bands = [59, 84, 102, 115];
-  const nearest = bands.reduce((best, band) => Math.abs(area - band) < Math.abs(area - best) ? band : best);
-  return Math.abs(area - nearest) <= 6 ? String(nearest) : null;
-}
-
 async function fetchWithRetry(url) {
   let lastError;
   const maxAttempts = 10;

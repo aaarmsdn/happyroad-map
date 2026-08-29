@@ -26,6 +26,8 @@ test("persisted filters reject wrong types and clamp numeric ranges", () => {
   assert.deepEqual(state, { distance: 1.5, households: 0, showStops: true, area: "전체", startHour: "", priceMetric: "max" });
   restoreFilters(state, { priceMetric: "average" });
   assert.equal(state.priceMetric, "average");
+  restoreFilters(state, { area: "70-79" });
+  assert.equal(state.area, "70-79");
 });
 
 test("persisted school visibility remains opt-in but restores an explicit choice", () => {
@@ -36,14 +38,14 @@ test("persisted school visibility remains opt-in but restores an explicit choice
   assert.equal(state.showSchools, true);
 });
 
-test("all known Seongsu Lotte Castle Park unit sizes remain selectable", async () => {
+test("all known Seongsu Lotte Castle Park area ranges remain selectable", async () => {
   const apartments = JSON.parse(await readFile(new URL("../public/data/apartments.json", import.meta.url), "utf8"));
   const complex = apartments.complexes.find(item => item.id === "8104");
   const links = apartments.links.filter(link => link.complexId === complex.id);
   const complexById = new Map([[complex.id, complex]]);
   const stationDirections = new Map(links.map(link => [link.stationId, new Set(link.directions)]));
 
-  for (const area of ["59", "84", "102", "115"]) {
+  for (const area of ["59-69", "80-89", "100-109", "110-120"]) {
     const result = matchingApartmentLinks(links, {
       area, distance: 1.5, households: 200, inboundTime: null, outboundTime: null
     }, stationDirections, complexById);
@@ -264,11 +266,11 @@ test("apartment prices default to highest and support highest, average, and lowe
   assert.equal(priceFor(prices, { area: "84" }, "1", "11215"), 120000);
   assert.equal(priceFor(prices, { area: "84", priceMetric: "average" }, "1", "11215"), 100000);
   assert.equal(priceFor(prices, { area: "84", priceMetric: "min" }, "1", "11215"), 80000);
-  assert.equal(priceFor(prices, { area: "전체" }, "1", "11215"), 150000);
-  assert.equal(priceFor(prices, { area: "전체", priceMetric: "average" }, "1", "11215"), 94000);
-  assert.equal(priceFor(prices, { area: "전체", priceMetric: "min" }, "1", "11215"), 60000);
-  assert.equal(pricePerPyeongFor(prices, { area: "전체" }, "1", "11215"), 5000);
-  assert.equal(pricePerPyeongFor(prices, { area: "전체", priceMetric: "average" }, "1", "11215"), 4000);
+  assert.equal(priceFor(prices, { area: "전체" }, "1", "11215"), 120000);
+  assert.equal(priceFor(prices, { area: "전체", priceMetric: "average" }, "1", "11215"), 100000);
+  assert.equal(priceFor(prices, { area: "전체", priceMetric: "min" }, "1", "11215"), 80000);
+  assert.equal(pricePerPyeongFor(prices, { area: "전체" }, "1", "11215"), 4700);
+  assert.equal(pricePerPyeongFor(prices, { area: "전체", priceMetric: "average" }, "1", "11215"), 3950);
   assert.equal(pricePerPyeongFor(prices, { area: "84", priceMetric: "min" }, "1", "11215"), 3150);
   assert.equal(priceColor({ priceColors: true }, 2499), "#18864b");
   assert.equal(priceColor({ priceColors: true }, 2500), "#2774ae");
@@ -288,7 +290,22 @@ test("legacy summaries never label medians as arithmetic averages", () => {
   assert.equal(pricePerPyeongFor(prices, { area: "전체", priceMetric: "average" }, "1", "11215"), null);
 });
 
-test("all-area prices include nonstandard area groups", () => {
+test("all-area prices choose the highest target area when 84 is unavailable", () => {
+  const prices = { complexes: { "1": {
+    matchStatus: "matched", matchMethod: "normalized_name_and_lawd_cd_from_boundary", matchRegionCode: "11215",
+    areas: {
+      "59": { count: 1, average: 80000, max: 90000, averagePerPyeong: 4483, maxPerPyeong: 5043 },
+      "102": { count: 2, average: 70000, max: 140000, averagePerPyeong: 2269, maxPerPyeong: 4538 },
+      "115": { count: 1, average: 75000, max: 130000, averagePerPyeong: 2157, maxPerPyeong: 3739 }
+    }
+  } } };
+  assert.equal(priceFor(prices, { area: "전체" }, "1", "11215"), 140000);
+  assert.equal(pricePerPyeongFor(prices, { area: "전체" }, "1", "11215"), 4538);
+  assert.equal(priceFor(prices, { area: "전체", priceMetric: "average" }, "1", "11215"), 70000);
+  assert.equal(pricePerPyeongFor(prices, { area: "전체", priceMetric: "average" }, "1", "11215"), 2269);
+});
+
+test("all-area prices include every 59-to-120 area group", () => {
   const prices = { complexes: { "1": {
     matchStatus: "matched", matchMethod: "normalized_name_and_lawd_cd_from_boundary", matchRegionCode: "11215",
     areas: {
@@ -299,4 +316,5 @@ test("all-area prices include nonstandard area groups", () => {
   assert.equal(priceFor(prices, { area: "전체", priceMetric: "average" }, "1", "11215"), 80000);
   assert.equal(priceFor(prices, { area: "전체", priceMetric: "min" }, "1", "11215"), 70000);
   assert.equal(pricePerPyeongFor(prices, { area: "전체" }, "1", "11215"), 3915);
+  assert.equal(priceFor(prices, { area: "70-79" }, "1", "11215"), 90000);
 });

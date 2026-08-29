@@ -1,5 +1,5 @@
 import { escapeHtml, formatPrice } from "./ui-utils.js?v=10";
-import { stopRepresentativeMinutes } from "./filter-data.js?v=38";
+import { stopRepresentativeMinutes } from "./filter-data.js?v=39";
 
 function clusterItems(items, pointOf, cellSize) {
   const buckets = new Map();

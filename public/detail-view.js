@@ -1,5 +1,6 @@
 import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
-import { overallTransactionPrice, overallTransactionPricePerPyeong, priceMetric, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=38";
+import { priceMetric, representativeAreaPrice, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=39";
+import { areaKeysForSelection } from "./area-data.js?v=1";
 
 export function stopDetailHtml(stop) {
   const variants = [...new Map(stop.entries.map(entry => [entry.uidKey, entry])).values()]
@@ -58,23 +59,15 @@ const priceMetricLabels = { max: "최고값", average: "평균값", min: "최저
 
 function areaMetrics(record, selectedArea, selectedMetric) {
   const metric = priceMetric(selectedMetric);
-  const ordered = selectedArea === "전체"
-    ? Object.keys(record?.areas || {}).sort((a, b) => Number(a) - Number(b))
-    : [selectedArea];
-  const available = ordered.filter(area => Number(record?.areas?.[area]?.count) > 0);
-  const overallAmount = overallTransactionPrice(record, metric);
-  const overallPerPyeong = overallTransactionPricePerPyeong(record, metric);
-  const overallValues = [overallAmount ? formatPrice(overallAmount) : "", overallPerPyeong > 0 ? `평당 ${overallPerPyeong.toLocaleString("ko-KR")}만` : ""].filter(Boolean).join(" · ");
-  const areaTradeCount = Object.values(record?.areas || {}).reduce((sum, data) => sum + (Number(data?.count) || 0), 0);
-  const outsideAreaNote = Number(record?.matchedTradeCount) > areaTradeCount ? " · 대상 면적 외 거래 포함" : "";
-  const overallRow = selectedArea === "전체" && overallValues
-    ? `<div class="price-row price-overall"><b>전체 면적</b><span>${overallValues}</span><small>${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건${outsideAreaNote}</small></div>` : "";
-  if (!available.length && overallRow) return `<div class="price-list">${overallRow}</div>`;
-  if (!available.length && selectedArea === "전체" && Number(record?.matchedTradeCount) > 0) {
-    return `<p class="empty-note">${priceMetricLabels[metric]} 갱신 대기 · 최근 거래 ${Number(record.matchedTradeCount).toLocaleString("ko-KR")}건</p>`;
-  }
-  if (!available.length) return `<p class="empty-note">선택 면적의 최근 실거래가가 없습니다.</p>`;
-  return `<div class="price-list">${overallRow}${available.map(area => {
+  const available = areaKeysForSelection(record?.areas, selectedArea);
+  const representative = representativeAreaPrice(record, metric, selectedArea);
+  const representativeValues = representative
+    ? [formatPrice(representative.amount), representative.perPyeong > 0 ? `평당 ${representative.perPyeong.toLocaleString("ko-KR")}만` : ""].filter(Boolean).join(" · ")
+    : "";
+  const representativeRow = representativeValues
+    ? `<div class="price-row price-overall"><b>대표 ${representative.area}㎡</b><span>${representativeValues}</span><small>${representative.count.toLocaleString("ko-KR")}건 · ${selectedArea === "전체" ? "전체" : escapeHtml(selectedArea.replace("-", "~") + "㎡")} 선택 기준</small></div>` : "";
+  if (!available.length) return `<p class="empty-note">${selectedArea === "전체" ? "59~120㎡" : escapeHtml(selectedArea.replace("-", "~") + "㎡")} 최근 실거래가가 없습니다.</p>`;
+  return `<div class="price-list">${representativeRow}${available.map(area => {
     const data = record.areas[area];
     const amount = transactionPrice(data, metric);
     const perPyeong = transactionPricePerPyeong(data, area, metric);

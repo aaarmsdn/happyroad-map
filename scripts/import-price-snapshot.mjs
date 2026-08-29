@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { APARTMENT_AREA_RANGES, areaTagsForValues } from "../public/area-data.js";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -38,7 +39,7 @@ for (const complex of apartments.complexes) {
   const areas = Object.fromEntries(bands.map(band => [band, source.areas?.[band] || { count: 0, min: null, median: null, max: null }]));
   const observed = bands.filter(band => Number(areas[band].count) > 0);
   if (!observed.length) continue;
-  complex.areaTags = bands.filter(band => complex.areaTags.includes(band) || observed.includes(band));
+  complex.areaTags = areaTagsForValues([...(complex.areaTags || []), ...observed]);
   prices.complexes[complex.id] = {
     matchStatus: "snapshot",
     matchMethod: "official_snapshot_by_complex_id",
@@ -53,8 +54,10 @@ for (const complex of apartments.complexes) {
 
 apartments.areaTagsGeneratedAt = provenance.generatedAt;
 apartments.source.areaTagSource = provenance.source;
+apartments.source.areaFilter = "59_to_120_exact_integer_groups";
 apartments.stats.priceStatus = "official_snapshot_seeded";
-apartments.stats.areaCounts = Object.fromEntries(bands.map(band => [band, apartments.complexes.filter(complex => complex.areaTags.includes(band)).length]));
+apartments.stats.areaFilter = "59_to_120";
+apartments.stats.areaCounts = Object.fromEntries(APARTMENT_AREA_RANGES.map(([range]) => [range, apartments.complexes.filter(complex => complex.areaTags.includes(range)).length]));
 prices.generatedAt = provenance.generatedAt;
 prices.snapshot = provenance;
 prices.refresh = { source: provenance.source, importedSnapshot: true, updatedComplexes };
