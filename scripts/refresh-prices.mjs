@@ -102,7 +102,7 @@ const idsForTradeAddress = trade => idsByAddress.get(addressIdentityKey(trade.re
 const eligibleIdsFor = (ids, trade) => {
   const tradeKey = addressIdentityKey(trade.regionCode, trade.legalDong, trade.jibun);
   return eligibleAddressIds(ids, tradeKey, addressesByComplex).filter(id => {
-    if (addressesByComplex.has(id) || !trade.buildYear) return true;
+    if (addressesByComplex.has(id)) return true;
     return isCompatibleBuildYear(complexById.get(id)?.completed, trade.buildYear);
   });
 };
@@ -162,6 +162,7 @@ const grouped = new Map();
 let skippedAmbiguous = 0;
 let skippedNoName = 0;
 let skippedRegionMismatch = 0;
+let skippedBuildYearMismatch = 0;
 let skippedAddressMismatch = 0;
 let matchedByAlias = 0;
 let matchedByUniqueContainment = 0;
@@ -211,6 +212,11 @@ for (const trade of targetTrades) {
     if (tradeKey && configuredNameIds.length) {
       skippedAddressMismatch += 1;
       rememberUnmatched(trade, "address_mismatch");
+      continue;
+    }
+    if ([...ids, ...aliasIds].some(id => regionByComplex.get(id) === trade.regionCode)) {
+      skippedBuildYearMismatch += 1;
+      rememberUnmatched(trade, trade.buildYear ? "incompatible_build_year" : "missing_build_year");
       continue;
     }
     if (ids.length) {
@@ -301,6 +307,7 @@ prices.refresh = {
   unmappedComplexes,
   skippedNoName,
   skippedRegionMismatch,
+  skippedBuildYearMismatch,
   skippedAmbiguous,
   skippedAddressMismatch,
   matchedByAlias,

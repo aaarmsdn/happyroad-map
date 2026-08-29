@@ -56,7 +56,9 @@ if (staleAddressPrices.length) throw new Error(`${staleAddressPrices.length} pri
 const incompatibleBuildYears = Object.entries(prices.complexes).filter(([complexId, record]) =>
   record.matchStatus === "matched"
   && record.matchMethod !== "official_address_and_lawd_cd"
-  && (record.matchedBuildYears || []).some(year => !isCompatibleBuildYear(complexById.get(complexId)?.completed, year))
+  && (!Array.isArray(record.matchedBuildYears)
+    || !record.matchedBuildYears.length
+    || record.matchedBuildYears.some(year => !isCompatibleBuildYear(complexById.get(complexId)?.completed, year)))
 );
 if (incompatibleBuildYears.length) throw new Error(`${incompatibleBuildYears.length} name-matched apartment prices have incompatible build years`);
 const hiddenPrices = Object.entries(prices.complexes).filter(([complexId, record]) =>

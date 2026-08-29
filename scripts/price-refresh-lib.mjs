@@ -55,7 +55,7 @@ export function hasLostOfficialParcelIdentity(record, identities) {
 export function isCompatibleBuildYear(completed, officialYear) {
   const completedYear = Number(String(completed || "").slice(0, 4)) || 0;
   const buildYear = Number(officialYear) || 0;
-  return !completedYear || !buildYear || Math.abs(completedYear - buildYear) <= 2;
+  return completedYear > 0 && buildYear > 0 && Math.abs(completedYear - buildYear) <= 2;
 }
 
 export function xmlValue(item, tag) {
