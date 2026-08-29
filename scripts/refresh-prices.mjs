@@ -3,7 +3,7 @@ import dns from "node:dns";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { addressIdentityKey, comparableName, fetchMonth, normalizeName, numberSignature, recentMonths, summarize, unmatchedNameReason } from "./price-refresh-lib.mjs";
-import { prepareDistricts, regionCodeFor } from "./region-match.mjs";
+import { officialRegionCodeFor, prepareDistricts } from "./region-match.mjs";
 import { APARTMENT_AREA_RANGES, areaKey, areaTagsForValues } from "../public/area-data.js";
 
 const projectDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,7 +20,7 @@ Optional:
   MOLIT_REGION_CODES  comma-separated five-digit LAWD_CD values
   MOLIT_MONTHS        months to fetch, default 3
 
-Without MOLIT_REGION_CODES, apartment coordinates and config/sgg.json determine the required regions.`);
+Without MOLIT_REGION_CODES, stored legal-region codes determine the required regions; config/sgg.json is the fallback.`);
 }
 
 if (process.argv.includes("--help")) {
@@ -47,7 +47,7 @@ const [apartments, prices, boundaries, nameAliases, addressIdentities] = await P
 
 const districts = prepareDistricts(boundaries);
 const complexById = new Map(apartments.complexes.map(complex => [complex.id, complex]));
-const regionByComplex = new Map(apartments.complexes.map(complex => [complex.id, regionCodeFor(complex, districts)]));
+const regionByComplex = new Map(apartments.complexes.map(complex => [complex.id, officialRegionCodeFor(complex, districts)]));
 const complexesByRegion = new Map();
 for (const complex of apartments.complexes) {
   const regionCode = regionByComplex.get(complex.id);

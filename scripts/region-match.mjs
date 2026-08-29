@@ -39,3 +39,7 @@ export function regionCodeFor(complex, districts) {
   }
   return null;
 }
+
+export function officialRegionCodeFor(complex, districts) {
+  return /^\d{5}$/.test(String(complex.regionCode || "")) ? complex.regionCode : regionCodeFor(complex, districts);
+}
