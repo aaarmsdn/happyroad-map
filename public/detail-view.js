@@ -1,5 +1,5 @@
 import { escapeHtml, formatDate, formatPrice, safeExternalUrl } from "./ui-utils.js?v=10";
-import { priceMetric, representativeAreaPrice, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=41";
+import { priceMetric, representativeAreaPrice, transactionPrice, transactionPricePerPyeong } from "./filter-data.js?v=42";
 import { areaKeysForSelection } from "./area-data.js?v=1";
 
 export function stopDetailHtml(stop) {

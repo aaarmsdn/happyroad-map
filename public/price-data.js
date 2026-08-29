@@ -77,8 +77,9 @@ export function priceColor(state, value) {
 }
 
 export function apartmentColor(state, perPyeong, roundTripMinutes) {
+  if (!Number.isFinite(perPyeong)) return "#63717a";
   if (state.apartmentColor === "none") return "#f04438";
-  if (state.apartmentColor !== "commute") return Number.isFinite(perPyeong) ? priceColor({ priceColors: true }, perPyeong) : "#63717a";
+  if (state.apartmentColor !== "commute") return priceColor({ priceColors: true }, perPyeong);
   if (!Number.isFinite(roundTripMinutes)) return "#63717a";
   if (roundTripMinutes < 120) return "#18864b";
   if (roundTripMinutes < 150) return "#2774ae";

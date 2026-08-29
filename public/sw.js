@@ -1,17 +1,17 @@
-const CACHE = "happyroad-v179";
+const CACHE = "happyroad-v180";
 const SHELL = [
   "./",
   "./index.html",
   "./styles.css?v=46",
-  "./app-main.js?v=156",
+  "./app-main.js?v=157",
   "./app-events.js?v=23",
   "./app-actions.js?v=4",
   "./commute-controller.js?v=41",
   "./commute-view.js?v=8",
   "./detail-view.js?v=50",
-  "./filter-data.js?v=41",
+  "./filter-data.js?v=42",
   "./area-data.js?v=1",
-  "./price-data.js?v=5",
+  "./price-data.js?v=6",
   "./filter-logic.js?v=12",
   "./map-view.js?v=64",
   "./school-data.js?v=2",

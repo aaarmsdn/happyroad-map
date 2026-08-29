@@ -233,6 +233,8 @@ test("apartment color supports price, round-trip time, and plain modes", () => {
   assert.equal(apartmentColor({ apartmentColor: "price" }, 9000, 60), "#d83a3a");
   assert.equal(apartmentColor({ apartmentColor: "price" }, null, 60), "#63717a");
   assert.equal(apartmentColor({ apartmentColor: "none" }, 9000, 60), "#f04438");
+  assert.equal(apartmentColor({ apartmentColor: "commute" }, null, 60), "#63717a");
+  assert.equal(apartmentColor({ apartmentColor: "none" }, null, 60), "#63717a");
 });
 
 test("apartment directions follow filtered station entries instead of unrelated route directions", () => {
