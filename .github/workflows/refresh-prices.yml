@@ -28,7 +28,7 @@ jobs:
   refresh:
     permissions:
       contents: write
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Refresh official transaction prices
@@ -41,27 +41,7 @@ jobs:
             echo "::error::MOLIT_API_KEY repository secret is missing."
             exit 1
           fi
-          status=1
-          for attempt in 1 2 3; do
-            set +e
-            output=$(npm run prices:refresh 2>&1)
-            status=$?
-            set -e
-            if [ "$status" -eq 0 ]; then
-              break
-            fi
-            reason=$(printf '%s\n' "$output" | grep -E 'Error:' | tail -1 || true)
-            echo "Refresh attempt $attempt failed: ${reason:-unknown error}"
-            if [ "$attempt" -lt 3 ]; then
-              sleep 30
-            fi
-          done
-          if [ "$status" -ne 0 ]; then
-            reason=$(printf '%s\n' "$output" | grep -E 'Error:' | tail -1 || true)
-            echo "::error::${reason:-Apartment price refresh failed.}"
-            exit "$status"
-          fi
-          printf '%s\n' "$output"
+          npm run prices:refresh
       - name: Validate generated data
         run: npm run check
       - name: Commit changed prices

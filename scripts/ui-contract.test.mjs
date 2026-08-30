@@ -320,6 +320,12 @@ test("price summary changes trigger the automatic refresh workflow", async () =>
   assert.match(workflow, /- "scripts\/price-refresh-lib\.mjs"/);
 });
 
+test("price refresh uses the Linux runner and retries each request instead of the whole batch", async () => {
+  const workflow = await read(".github/workflows/refresh-prices.yml");
+  assert.doesNotMatch(workflow, /windows-latest|for attempt in/);
+  assert.match(workflow, /jobs:[\s\S]*?refresh:[\s\S]*?runs-on: ubuntu-latest/);
+});
+
 test("pending prices cannot reach apartment details", () => {
   const record = { matchStatus: "pending", matchMethod: "legacy", matchRegionCode: null, areas: { "84": { count: 1, median: 100000 } } };
   assert.equal(priceRecordForDisplay({ complexes: { "1": record } }, "1", "11200"), null);
