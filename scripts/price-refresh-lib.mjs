@@ -35,10 +35,10 @@ export function uniqueParcelIdentity(matches, parcelRows) {
 }
 
 export function safeParcelRows(chosen, rowsByPnu, allowShared = false) {
-  const chosenIds = new Set(chosen.map(row => row.id));
+  const chosenRows = new Set(chosen);
   return chosen.filter(row => {
     const parcelRows = rowsByPnu.get(row.pnu) || [];
-    return parcelRows.length === 1 || (allowShared && parcelRows.length > 1 && parcelRows.every(candidate => chosenIds.has(candidate.id)));
+    return parcelRows.length === 1 || (allowShared && parcelRows.length > 1 && parcelRows.every(candidate => chosenRows.has(candidate)));
   });
 }
 

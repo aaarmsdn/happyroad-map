@@ -73,10 +73,12 @@ test("coordinate parcel matching rejects a parcel shared by multiple official co
 test("name matching rejects shared parcels unless a reviewed alias allows them", () => {
   const first = { id: "a", pnu: "p" };
   const second = { id: "b", pnu: "p" };
+  const duplicateId = { id: "a", pnu: "p" };
   const rows = new Map([["p", [first, second]]]);
   assert.deepEqual(safeParcelRows([first], rows), []);
   assert.deepEqual(safeParcelRows([first], rows, true), []);
   assert.deepEqual(safeParcelRows([first, second], rows, true), [first, second]);
+  assert.deepEqual(safeParcelRows([first], new Map([["p", [first, duplicateId]]]), true), []);
 });
 
 test("parcel-configured complexes require a complete matching trade address", () => {
@@ -233,7 +235,10 @@ test("identity refresh enforces shared-PNU rules across official row types", asy
   const complexes = [
     { id: "1", name: "공유단지", regionCode: "11680", households: 100, completed: "2020-01-01" },
     { id: "2", name: "검토별칭", regionCode: "11680", households: 300, completed: "2020-01-01" },
-    { id: "3", name: "타입혼합", regionCode: "11680", households: 100, completed: "2020-01-01" }
+    { id: "3", name: "타입혼합", regionCode: "11680", households: 100, completed: "2020-01-01" },
+    { id: "4", name: "분할단지", regionCode: "11680", households: 300, completed: "2020-01-01" },
+    { id: "5", name: "부분단지", regionCode: "11680", households: 300, completed: "2020-01-01" },
+    { id: "6", name: "한빛마을", regionCode: "11680", households: 300, completed: "2020-01-01" }
   ].map(complex => ({ ...complex, lat: 37.5, lng: 127 }));
   await Promise.all([
     writeFile(path.join(tempDir, "public", "data", "apartments.json"), JSON.stringify({ complexes })),
@@ -248,7 +253,14 @@ test("identity refresh enforces shared-PNU rules across official row types", asy
     "2,1168010300100020000,서울특별시 강남구 테스트동 2,별칭A,,,1,,100,20200101",
     "5,1168010300100020000,서울특별시 강남구 테스트동 3,별칭B,,,1,,200,20200101",
     "3,1168010300100030000,서울특별시 강남구 테스트동 5,타입혼합,,,1,,100,20200101",
-    "6,1168010300100030000,서울특별시 강남구 테스트동 6,상가행,,,2,,10,20200101"
+    "6,1168010300100030000,서울특별시 강남구 테스트동 6,상가행,,,2,,10,20200101",
+    "7,1168010300100040000,서울특별시 강남구 테스트동 4,분할단지1동,분할단지,,1,,100,20200101",
+    "8,1168010300100040000,서울특별시 강남구 테스트동 4,분할단지2동,분할단지,,1,,200,20200101",
+    "9,1168010300100050000,서울특별시 강남구 테스트동 5,부분단지1동,부분단지,,1,,100,20200101",
+    "10,1168010300100050000,서울특별시 강남구 테스트동 5,다른단지,,,1,,10,20200101",
+    "11,1168010300100060000,서울특별시 강남구 테스트동 6,부분단지2동,부분단지,,1,,200,20200101",
+    "12,1168010300100070000,서울특별시 강남구 테스트동 7,한빛마을,,,1,,100,20200101",
+    "13,1168010300100070000,서울특별시 강남구 테스트동 7,한빛마을2차,,,1,,200,20200101"
   ].join("\n"));
   try {
     const result = await new Promise(resolve => {
@@ -262,6 +274,9 @@ test("identity refresh enforces shared-PNU rules across official row types", asy
     assert.equal(identities.complexes["1"], undefined);
     assert.deepEqual(identities.complexes["2"], ["테스트동|2", "테스트동|3"]);
     assert.equal(identities.complexes["3"], undefined);
+    assert.deepEqual(identities.complexes["4"], ["테스트동|4"]);
+    assert.equal(identities.complexes["5"], undefined);
+    assert.equal(identities.complexes["6"], undefined);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

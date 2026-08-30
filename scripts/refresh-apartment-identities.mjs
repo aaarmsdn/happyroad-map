@@ -146,16 +146,17 @@ for (const complex of apartments.complexes) {
     } else if (matchingHouseholds.length === 1) {
       chosen = matchingHouseholds;
       method = "contained_name_households_year";
+    } else if (candidates.length > 1 && exact.length === candidates.length
+      && closeHouseholdCount(candidates.reduce((sum, row) => sum + row.households, 0), complex.households)) {
+      chosen = candidates;
+      method = "contained_name_aggregate_households_year";
     } else if (candidates.length && exact.length && new Set(candidates.map(row => row.pnu)).size === 1) {
       chosen = candidates;
       method = "exact_name_shared_parcel_year";
-    } else if (candidates.length > 1 && closeHouseholdCount(candidates.reduce((sum, row) => sum + row.households, 0), complex.households)) {
-      chosen = candidates;
-      method = "contained_name_aggregate_households_year";
     }
   }
-  const safeRows = safeParcelRows(chosen, rowsByPnu, method === "reviewed_alias");
-  const identities = [...new Set(safeRows.map(apartmentIdentity).filter(identity => {
+  const safeRows = safeParcelRows(chosen, rowsByPnu, method === "reviewed_alias" || method === "contained_name_aggregate_households_year");
+  const identities = [...new Set((safeRows.length === chosen.length ? safeRows : []).map(apartmentIdentity).filter(identity => {
     const [legalDong, jibun] = String(identity || "").split("|");
     return addressIdentityKey(complex.regionCode, legalDong, jibun);
   }))].sort((left, right) => left.localeCompare(right, "ko"));
@@ -218,7 +219,7 @@ for (const [complexId, identities] of Object.entries(complexes)) {
   else delete complexes[complexId];
 }
 const unsafeSharedParcels = Object.entries(complexes).filter(([complexId, identities]) => {
-  if (methodByComplex.get(complexId) === "reviewed_alias") return false;
+  if (["reviewed_alias", "contained_name_aggregate_households_year"].includes(methodByComplex.get(complexId))) return false;
   const rows = rowsByRegion.get(complexById.get(complexId)?.regionCode) || [];
   return identities.some(identity => rows.some(row => apartmentIdentity(row) === identity && rowsByPnu.get(row.pnu)?.length > 1));
 });

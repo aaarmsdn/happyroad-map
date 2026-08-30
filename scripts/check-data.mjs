@@ -47,7 +47,6 @@ const staleAddressPrices = Object.entries(prices.complexes).filter(([complexId, 
   if (record.matchStatus !== "matched") return false;
   const identities = addressIdentities.complexes?.[complexId] || [];
   if (!identities.length) return hasLostOfficialParcelIdentity(record, identities);
-  if (record.matchMethod !== "official_address_and_lawd_cd") return true;
   if (!Array.isArray(record.matchedOfficialAddresses) || !record.matchedOfficialAddresses.length) return true;
   const configuredAddresses = new Set(identities.map(identity => identity.replace("|", " ")));
   return record.matchedOfficialAddresses.some(address => !configuredAddresses.has(address));
@@ -93,6 +92,10 @@ console.log(JSON.stringify({
   complexes: apartments.complexes.length,
   links: apartments.links.length,
   prices: Object.keys(prices.complexes).length,
+  addressIdentities: Object.keys(addressIdentities.complexes || {}).length,
+  pendingWithoutAddressIdentity: apartments.complexes.filter(complex =>
+    prices.complexes[complex.id]?.matchStatus === "pending" && !(addressIdentities.complexes?.[complex.id] || []).length
+  ).length,
   schools: schools.schools.length,
   districtRegions: new Set(regionCodes).size,
   generatedAt: prices.generatedAt
