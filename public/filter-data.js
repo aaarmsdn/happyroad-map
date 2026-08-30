@@ -165,6 +165,7 @@ export function matchingApartmentLinks(links, state, stationDirections, complexB
     if (link.distanceKm > state.distance) continue;
     const complex = complexById.get(link.complexId);
     if (!complex || complex.households < state.households) continue;
+    if (!complex.areaTags?.length) continue;
     if (state.area !== "전체" && !areaTagMatches(complex.areaTags, state.area)) continue;
     if (!stationDirections.has(link.stationId)) continue;
     if (!linksByComplex.has(link.complexId)) linksByComplex.set(link.complexId, []);

@@ -63,6 +63,21 @@ test("empty area selection hides every apartment", () => {
   assert.equal(result.size, 0);
 });
 
+test("all area selection excludes complexes without a 59 to 120 square-meter unit", () => {
+  const result = matchingApartmentLinks(
+    [{ complexId: "1", stationId: "s", distanceKm: 0.2 }],
+    { area: "전체", distance: 1, households: 0, inboundTime: null, outboundTime: null },
+    new Map([["s", new Set(["출근"])]]),
+    new Map([["1", { households: 100, areaTags: [] }]])
+  );
+  assert.equal(result.size, 0);
+});
+
+test("Jukjeon Station Solheim has no eligible exclusive-area tag", async () => {
+  const apartments = JSON.parse(await readFile(new URL("../public/data/apartments.json", import.meta.url), "utf8"));
+  assert.deepEqual(apartments.complexes.find(item => item.id === "123041").areaTags, []);
+});
+
 test("apartment links retain every accessible commute direction while choosing the nearest stop", () => {
   const links = [
     { complexId: "1", stationId: "in", distanceKm: 0.8, travelMinutes: 12, routes: ["출근 노선"], directions: ["출근"] },
