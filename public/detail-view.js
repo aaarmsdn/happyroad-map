@@ -39,7 +39,7 @@ function stopTiming(entry) {
     ? entry.time
     : entry.companyTime || entry.scheduledCompanyDepartureTime || entry.turnStartTime;
   const arrival = inbound
-    ? entry.companyTime || entry.scheduledCompanyArrivalTime || entry.turnFinalArrivalTime
+    ? entry.timeBasis ? entry.companyTime : entry.companyTime || entry.scheduledCompanyArrivalTime || entry.turnFinalArrivalTime
     : entry.time;
   const rawMinutes = inbound ? entry.minutesToCompany : entry.minutesFromCompany;
   const minutes = rawMinutes === null || rawMinutes === "" || rawMinutes === undefined ? null : Number(rawMinutes);
@@ -47,6 +47,11 @@ function stopTiming(entry) {
   if (Number.isFinite(minutes) && minutes >= 0) parts.push(`${Math.round(minutes)}분`);
   if (clockTime(arrival) !== "-") parts.push(`${inbound ? "회사" : "정류장"} ${clockTime(arrival)} 도착`);
   if (entry.timeEstimated) parts.push("추정");
+  if (entry.timeBasis) {
+    if (!Number.isFinite(minutes)) parts.push(entry.time && entry.companyTime ? "소요시간 확인 불가" : "한 달 기록 없음");
+    else if (entry.timeBasis === "scheduled") parts.push("정시 출발");
+    else parts.push(`한 달 평균 · ${entry.sampleDays}일`);
+  }
   return { departure: clockTime(departure), detail: parts.join(" · ") };
 }
 

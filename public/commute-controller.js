@@ -1,4 +1,4 @@
-import { accessRoutesFor, isKoreaPoint, nearestShuttleStops, nextFiveMinuteValue, recommendCommuteJourneys } from "./commute-routing.js?v=34";
+import { accessRoutesFor, isKoreaPoint, nearestShuttleStops, nextFiveMinuteValue, recommendCommuteJourneys } from "./commute-routing.js?v=35";
 import { commuteJourneyDetailHtml, commuteResultsHtml } from "./commute-view.js?v=8";
 import { addJourneyPaths, routeSegmentPoints } from "./route-view.js?v=4";
 import { escapeHtml } from "./ui-utils.js?v=10";

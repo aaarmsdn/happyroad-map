@@ -4,6 +4,7 @@ const minutesOf = value => {
   const match = String(value || "").match(/^(\d{1,2}):(\d{2})/);
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 };
+const usableMonthlyTime = entry => !entry.timeBasis || Number.isFinite(entry.displayMinutes);
 const MAX_COMMUTE_WAIT_MINUTES = 16 * 60;
 
 const dateAtMinutes = (base, minutes) => {
@@ -29,7 +30,7 @@ export function formatShuttleTime(value) {
 
 function routeGroups(entries, category) {
   const groups = new Map();
-  entries.filter(entry => (entry.direction || entry.routeCategory) === category).forEach(entry => {
+  entries.filter(entry => (entry.direction || entry.routeCategory) === category && usableMonthlyTime(entry)).forEach(entry => {
     if (!groups.has(entry.uidKey)) groups.set(entry.uidKey, []);
     groups.get(entry.uidKey).push(entry);
   });
@@ -86,7 +87,7 @@ export function nearestShuttleStops(entries, mode, point, limit = 5, departureAt
   const category = mode === "to-company" ? "출근" : "퇴근";
   const upcoming = departureAt ? upcomingStopKeys(entries, mode, departureAt, point) : null;
   const stops = new Map();
-  entries.filter(entry => (entry.direction || entry.routeCategory) === category && !entry.isCompany && (!upcoming || upcoming.has(entry.stationUid || entry.station))).forEach(entry => {
+  entries.filter(entry => (entry.direction || entry.routeCategory) === category && usableMonthlyTime(entry) && !entry.isCompany && (!upcoming || upcoming.has(entry.stationUid || entry.station))).forEach(entry => {
     const key = entry.stationUid || entry.station;
     const candidate = { key, station: entry.station, lat: entry.lat, lng: entry.lng, distanceKm: distanceKm(point, entry) };
     if (!stops.has(key) || candidate.distanceKm < stops.get(key).distanceKm) stops.set(key, candidate);
@@ -116,7 +117,7 @@ export function findShuttleCandidates({ entries, mode, point, departureAt, acces
         const arrivalDate = dateAtMinutes(shuttleDate, companyMinutes);
         if (arrivalDate < shuttleDate) arrivalDate.setDate(arrivalDate.getDate() + 1);
         const waitMinutes = Math.round((shuttleDate - departure) / 60000) - access;
-        const shuttleDuration = Math.round((arrivalDate - shuttleDate) / 60000);
+        const shuttleDuration = stop.timeBasis ? stop.minutesToCompany : Math.round((arrivalDate - shuttleDate) / 60000);
         results.push({
           uidKey: stop.uidKey, routeName: stop.routeName, station: stop.station,
           shuttleAt: formatShuttleTime(stop.time), arrivalAt: formatShuttleTime(company.time),
@@ -135,7 +136,7 @@ export function findShuttleCandidates({ entries, mode, point, departureAt, acces
         const stopDate = dateAtMinutes(companyDate, stopMinutes);
         if (stopDate < companyDate) stopDate.setDate(stopDate.getDate() + 1);
         const waitMinutes = Math.round((companyDate - departure) / 60000);
-        const shuttleDuration = Math.round((stopDate - companyDate) / 60000);
+        const shuttleDuration = stop.timeBasis ? stop.minutesFromCompany : Math.round((stopDate - companyDate) / 60000);
         results.push({
           uidKey: stop.uidKey, routeName: stop.routeName, station: stop.station,
           shuttleAt: formatShuttleTime(company.time), arrivalAt: formatShuttleTime(stop.time),

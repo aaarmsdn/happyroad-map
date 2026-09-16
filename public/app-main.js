@@ -1,7 +1,7 @@
 import { bindEvents } from "./app-events.js?v=23";
 import { locateUser, populateFilterOptions, resetApp } from "./app-actions.js?v=4";
-import { createCommutePlanner } from "./commute-controller.js?v=41";
-import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=51";
+import { createCommutePlanner } from "./commute-controller.js?v=42";
+import { apartmentDetailHtml, schoolDetailHtml, stopDetailHtml } from "./detail-view.js?v=53";
 import { apartmentColor, apartmentCommuteTimes, apartmentDoorTimes, apartmentLinkTimings, apartmentRoundTripMinutes, directionsByStation, entryMatches, filteredEntries, matchingApartmentLinks, priceFor, pricePerPyeongFor, priceRecordForDisplay, prioritizeCommuteLinks, routeRequestForStop } from "./filter-data.js?v=44";
 import { restoreFilters, selectGlobalRoute } from "./filter-logic.js?v=12";
 import { addApartmentMarkers, addSchoolMarkers, addStopMarkers, groupStops } from "./map-view.js?v=66";
@@ -392,7 +392,7 @@ async function initialize() {
   bindEvents({ state, syncControls, renderMap, renderSelectedApartmentDetail, setPriceMetric, setApartmentColor, showRoute, openApartmentStopDetail, renderSearchResults, selectSearchResult, locate, reset, closeDetail });
   commutePlanner.bind();
   renderMap();
-  $("#shuttleFreshness").textContent = `셔틀 데이터 업데이트 ${formatDate(shuttle.generatedAt)}`;
+  $("#shuttleFreshness").textContent = shuttle.source.monthly ? `출퇴근 평균 ${shuttle.source.monthly.from.replaceAll("-", ".")}~${shuttle.source.monthly.through.slice(5).replace("-", ".")} · 1호차` : `셔틀 데이터 업데이트 ${formatDate(shuttle.generatedAt)}`;
   $("#apartmentFreshness").textContent = `가격 데이터 업데이트 ${prices.generatedAt ? formatDate(prices.generatedAt) : "갱신 대기"}`;
   lucide.createIcons();
   $("#loadingScreen").classList.add("done");

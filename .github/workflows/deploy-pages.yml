@@ -29,7 +29,7 @@ jobs:
       - name: Run core tests
         run: node --test scripts/browser-route-mock.test.mjs scripts/commute-routing.test.mjs scripts/filter-logic.test.mjs scripts/map-cluster.test.mjs scripts/map-view.test.mjs
       - name: Run data tests
-        run: node --test scripts/price-refresh.test.mjs scripts/region-match.test.mjs scripts/route-view-data.test.mjs scripts/school-data.test.mjs scripts/ui-contract.test.mjs scripts/ui-data.test.mjs
+        run: node --test scripts/shuttle-monthly.test.mjs scripts/price-refresh.test.mjs scripts/region-match.test.mjs scripts/route-view-data.test.mjs scripts/school-data.test.mjs scripts/ui-contract.test.mjs scripts/ui-data.test.mjs
       - name: Run Worker tests
         run: node --test scripts/worker-route-geometry.test.mjs scripts/worker.test.mjs
       - name: Run browser tests

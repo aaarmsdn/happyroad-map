@@ -60,26 +60,17 @@ test("real shuttle segments never bridge a source geometry gap over 500 meters",
   assert.ok(rejected > 0);
 });
 
-test("generated estimates fill every missing shuttle duration without changing source data", async () => {
+test("legacy estimates leave monthly records and missing observations unchanged", async () => {
   const window = {};
   const context = { window };
   vm.runInNewContext(await readFile(new URL("../public/data/shuttle-data.js", import.meta.url), "utf8"), context);
-  const expected = window.HAPPYROAD_MAP_DATA.entries.filter(entry => {
-    const field = entry.direction === "출근" ? "minutesToCompany" : entry.direction === "퇴근" ? "minutesFromCompany" : null;
-    return field && (entry[field] === null || entry[field] === "" || entry[field] === undefined);
-  }).length;
+  const before = JSON.stringify(window.HAPPYROAD_MAP_DATA.entries);
   vm.runInNewContext(await readFile(new URL("../public/data/shuttle-time-estimates.js", import.meta.url), "utf8"), context);
-  const missing = window.HAPPYROAD_MAP_DATA.entries.filter(entry => {
-    const field = entry.direction === "출근" ? "minutesToCompany" : entry.direction === "퇴근" ? "minutesFromCompany" : null;
-    return field && (entry[field] === null || entry[field] === "" || entry[field] === undefined);
-  });
+  assert.equal(JSON.stringify(window.HAPPYROAD_MAP_DATA.entries), before);
   const gongdeok = window.HAPPYROAD_MAP_DATA.entries.find(entry => entry.routeName === "신길선" && entry.station === "공덕역 7번출구");
-
-  assert.equal(window.HAPPYROAD_SHUTTLE_TIME_ESTIMATES.count, expected);
-  assert.equal(missing.length, 0);
-  assert.equal(gongdeok.turnName, "통상 18시퇴근");
-  assert.equal(gongdeok.timeEstimated, true);
-  assert.ok(gongdeok.minutesFromCompany > 120);
+  assert.equal(gongdeok.timeBasis, "missing");
+  assert.equal(gongdeok.minutesFromCompany, null);
+  assert.equal(gongdeok.time, "");
 });
 
 test("generated estimates never overwrite an authoritative shuttle duration", async () => {
@@ -93,6 +84,7 @@ test("generated estimates never overwrite an authoritative shuttle duration", as
   const [turnUid, stopOrder, stationUid] = estimateKey.split(":");
   const entry = window.HAPPYROAD_MAP_DATA.entries.find(item => item.turnUid === turnUid && String(item.stopOrder) === stopOrder && item.stationUid === stationUid);
   const field = entry.direction === "출근" ? "minutesToCompany" : "minutesFromCompany";
+  delete entry.timeBasis;
   entry[field] = 7;
   entry.time = "12:34";
   entry.sourceTimeText = "원본 시간";
@@ -172,6 +164,6 @@ test("Gwanggyo The Liv uses normal inbound and 18:00 outbound commute times", as
   }
 
   const commute = apartmentCommuteTimes(links, stations, 1.5, true);
-  assert.deepEqual([commute.inbound.totalMinutes, commute.outbound.totalMinutes, commute.roundTripMinutes], [63, 84, 147]);
-  assert.ok(stations.get(commute.outbound.stationId).entries.some(entry => entry.turnName === "통상 18시퇴근" && entry.minutesFromCompany === 81));
+  assert.deepEqual([commute.inbound.totalMinutes, commute.outbound.totalMinutes, commute.roundTripMinutes], [57, 79, 136]);
+  assert.ok(stations.get(commute.outbound.stationId).entries.some(entry => entry.turnName === "통상 18시퇴근" && entry.minutesFromCompany === 76));
 });
