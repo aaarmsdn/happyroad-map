@@ -1,4 +1,4 @@
-const CACHE = "happyroad-v185";
+const CACHE = "happyroad-v186";
 const SHELL = [
   "./",
   "./index.html",
@@ -26,8 +26,8 @@ const SHELL = [
   "./vendor/leaflet.css",
   "./vendor/leaflet.js",
   "./vendor/lucide.js",
-  "./data/shuttle-data.js",
-  "./data/shuttle-time-estimates.js"
+  "./data/shuttle-data.js?v=20260916",
+  "./data/shuttle-time-estimates.js?v=20260916"
 ];
 
 self.addEventListener("install", event => {

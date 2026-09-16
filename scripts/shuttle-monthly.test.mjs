@@ -51,3 +51,12 @@ test("published data uses the verified month and never treats missing duration a
     if (row.direction === "퇴근" && row.isCompany && row.timeBasis === "scheduled") assert.equal(row.time, row.scheduledCompanyDepartureTime);
   }
 });
+
+test("page and offline shell version both shuttle assets to avoid stale HTTP caches", async () => {
+  const [html, worker] = await Promise.all(["../public/index.html", "../public/sw.js"].map(file => readFile(new URL(file, import.meta.url), "utf8")));
+  for (const file of ["shuttle-data", "shuttle-time-estimates"]) {
+    const url = `./data/${file}.js?v=20260916`;
+    assert.ok(html.includes(`src="${url}"`));
+    assert.ok(worker.includes(`"${url}"`));
+  }
+});
