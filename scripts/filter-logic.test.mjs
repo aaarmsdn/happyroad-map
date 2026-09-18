@@ -336,3 +336,22 @@ test("all-area prices include every 59-to-120 area group", () => {
   assert.equal(pricePerPyeongFor(prices, { area: "전체" }, "1", "11215"), 3915);
   assert.equal(priceFor(prices, { area: "70-79" }, "1", "11215"), 90000);
 });
+
+
+test("apartment commute excludes weekend-only runs before route preference and fallback", () => {
+  const weekdayIn = { routeName: "평일선", direction: "출근", turnName: "조기 출근", companyTime: "07:00", time: "06:00", minutesToCompany: 60 };
+  const weekdayOut = { routeName: "평일선", direction: "퇴근", turnName: "통상 19시퇴근", companyTime: "19:00", time: "20:10", minutesFromCompany: 70 };
+  for (const weekend of ["주말", "주말선", "노선(토)", "노선(일)", "토요일", "일요일", "공휴일"]) {
+    const inbound = { ...weekdayIn, routeName: weekend, turnName: "통상 출근", companyTime: "08:00", minutesToCompany: 10 };
+    const outbound = { ...weekdayOut, routeName: weekend, turnName: "통상 18시퇴근", companyTime: "18:00", minutesFromCompany: 10 };
+    const links = [{ stationId: "shared", distanceKm: 0, routes: [weekend] }];
+    const stations = new Map([["shared", { entries: [inbound, outbound, weekdayIn, weekdayOut] }]]);
+    const commute = apartmentCommuteTimes(links, stations);
+    assert.equal(commute.inbound.totalMinutes, 60, weekend);
+    assert.equal(commute.outbound.totalMinutes, 70, weekend);
+    assert.equal(apartmentLinkTimings(links[0], stations).inboundStopAt, "06:00");
+    assert.equal(apartmentCommuteTimes(links, new Map([["shared", { entries: [inbound, outbound] }]])).roundTripMinutes, null);
+  }
+  const turnOnly = new Map([["shared", { entries: [{ ...weekdayIn, turnName: "통상 출근 (주말)" }] }]]);
+  assert.equal(apartmentCommuteTimes([{ stationId: "shared", distanceKm: 0 }], turnOnly).inbound, null);
+});

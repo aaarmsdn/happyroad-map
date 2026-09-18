@@ -88,7 +88,8 @@ function apartmentLinkEntries(link, stations) {
   const routes = new Set(link?.routes || []);
   const entries = (stations.get(link?.stationId)?.entries || []).filter(entry => {
     const direction = entry.direction || entry.routeCategory;
-    return !directions.size || directions.has(direction);
+    return !/주말|토요일|일요일|공휴일|\([토일]\)/.test(`${entry.routeName || ""} ${entry.turnName || ""}`)
+      && (!directions.size || directions.has(direction));
   });
   if (!routes.size) return entries;
   const preferred = new Set(["출근", "퇴근"].filter(direction => entries.some(entry => {

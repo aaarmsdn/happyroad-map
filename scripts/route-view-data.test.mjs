@@ -149,7 +149,7 @@ test("estimate generator uses sibling schedules before protected Kakao driving",
   assert.equal(requests[0].body.departureTime.length, 12);
 });
 
-test("Gwanggyo The Liv uses normal inbound and 18:00 outbound commute times", async () => {
+test("Gwanggyo The Liv uses weekday normal inbound and 18:00 outbound commute times", async () => {
   const window = {};
   const context = { window };
   vm.runInNewContext(await readFile(new URL("../public/data/shuttle-data.js", import.meta.url), "utf8"), context);
@@ -164,6 +164,23 @@ test("Gwanggyo The Liv uses normal inbound and 18:00 outbound commute times", as
   }
 
   const commute = apartmentCommuteTimes(links, stations, 1.5, true);
-  assert.deepEqual([commute.inbound.totalMinutes, commute.outbound.totalMinutes, commute.roundTripMinutes], [57, 79, 136]);
+  assert.deepEqual([commute.inbound.totalMinutes, commute.outbound.totalMinutes, commute.roundTripMinutes], [68, 79, 147]);
   assert.ok(stations.get(commute.outbound.stationId).entries.some(entry => entry.turnName === "통상 18시퇴근" && entry.minutesFromCompany === 76));
+});
+
+
+test("Gwanggyo Jungheung apartment commute uses weekday routes", async () => {
+  const window = {};
+  vm.runInNewContext(await readFile(new URL("../public/data/shuttle-data.js", import.meta.url), "utf8"), { window });
+  const apartments = JSON.parse(await readFile(new URL("../public/data/apartments.json", import.meta.url), "utf8"));
+  const complex = apartments.complexes.find(item => item.name === "광교중흥에스클래스(주상복합)");
+  const links = apartments.links.filter(link => link.complexId === complex.id);
+  const stations = new Map();
+  for (const entry of window.HAPPYROAD_MAP_DATA.entries) {
+    if (!stations.has(entry.stationUid)) stations.set(entry.stationUid, { entries: [] });
+    stations.get(entry.stationUid).entries.push(entry);
+  }
+  const commute = apartmentCommuteTimes(links, stations, 1.5, true);
+  assert.deepEqual([commute.inbound.totalMinutes, commute.outbound.totalMinutes, commute.roundTripMinutes], [75, 79, 154]);
+  assert.equal(commute.inbound.stationId, "202505231046483361530500120STA");
 });
