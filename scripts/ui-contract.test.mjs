@@ -444,3 +444,11 @@ test("service worker precaches every versioned module dependency", async () => {
     }
   }
 });
+
+test("map tiles identify their origin without exposing page paths", async () => {
+  const [app, html] = await Promise.all([read("public/app-main.js"), read("public/index.html")]);
+  assert.match(app, /L\.tileLayer\("https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png"/);
+  assert.match(app, /referrerPolicy: "strict-origin-when-cross-origin"/);
+  assert.match(html, /img-src 'self' data: https:\/\/tile\.openstreetmap\.org;/);
+  assert.match(html, /name="referrer" content="no-referrer"/);
+});

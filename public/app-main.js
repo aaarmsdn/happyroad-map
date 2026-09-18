@@ -375,7 +375,7 @@ async function initialize() {
   groupStops(shuttle.entries).forEach((stop, key) => stations.set(key, stop));
   map = L.map("map", { zoomControl: false, preferCanvas: true, minZoom: 6 }).setView(shuttle.company, 10);
   L.control.zoom({ position: "bottomleft" }).addTo(map);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin", attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
   stopLayer = L.layerGroup().addTo(map);
   apartmentLayer = L.layerGroup().addTo(map);
   schoolLayer = L.layerGroup().addTo(map);
