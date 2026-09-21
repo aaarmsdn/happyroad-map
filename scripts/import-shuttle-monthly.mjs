@@ -12,6 +12,20 @@ const seconds = value => {
 const clock = value => value === null ? "" : new Date(Math.round(value) * 1000).toISOString().slice(11, 19);
 const minutes = value => value === null ? null : Math.floor(value / 60);
 
+export function applyServiceWeekdays(shuttle, details) {
+  const codes = ["WKD-SUN", "WKD-MON", "WKD-TUE", "WKD-WED", "WKD-THU", "WKD-FRI", "WKD-SAT"];
+  for (const entry of shuttle.entries) {
+    const turn = details.get(entry.turnUid);
+    // ponytail: weekly calendar only; WKD-HOLI needs a separate dated holiday calendar.
+    const days = (turn?.earlyDriveWeekly || []).filter(day => day.weekdayCode !== "WKD-HOLI").map(day => {
+      const index = codes.indexOf(day.weekdayCode);
+      if (index < 0) throw new Error(`Unknown service weekday: ${day.weekdayCode}`);
+      return index;
+    });
+    entry.serviceWeekdays = turn?.useYn === false ? [] : [...new Set(days)].sort();
+  }
+}
+
 export function applyMonthly(shuttle, averages, schedules, details, period) {
   for (const row of averages) {
     if (!row.routeUid || !row.turnUid || !row.stationUid || !Number.isInteger(row.sampleDays) || row.sampleDays < 0 || row.sampleDays > 31
@@ -110,6 +124,7 @@ async function main() {
   const routes = await Promise.all(routeFiles.map(async file => JSON.parse(gunzipSync(await readFile(`${root}/routes/${file}`)))));
   const details = new Map(routes.flatMap(route => route.data.turns.map(turn => [turn.uid, turn])));
   const shuttle = context.window.HAPPYROAD_MAP_DATA;
+  applyServiceWeekdays(shuttle, details);
   const report = applyMonthly(shuttle, averages, schedules, details, { from: manifest.periodStart, through: manifest.periodEnd });
   shuttle.generatedAt = new Date().toISOString();
   await writeFile(new URL("../public/data/shuttle-data.js", import.meta.url), `window.HAPPYROAD_MAP_DATA=${JSON.stringify(shuttle)};\n`);

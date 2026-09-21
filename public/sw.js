@@ -1,12 +1,12 @@
-const CACHE = "happyroad-v188";
+const CACHE = "happyroad-v189";
 const SHELL = [
   "./",
   "./index.html",
   "./styles.css?v=46",
-  "./app-main.js?v=164",
+  "./app-main.js?v=165",
   "./app-events.js?v=23",
   "./app-actions.js?v=4",
-  "./commute-controller.js?v=42",
+  "./commute-controller.js?v=43",
   "./commute-view.js?v=8",
   "./detail-view.js?v=54",
   "./filter-data.js?v=45",
@@ -17,7 +17,7 @@ const SHELL = [
   "./school-data.js?v=2",
   "./request-gate.js?v=1",
   "./route-view.js?v=4",
-  "./commute-routing.js?v=35",
+  "./commute-routing.js?v=36",
   "./korea-boundary.js?v=3",
   "./search-view.js?v=10",
   "./ui-utils.js?v=10",
@@ -26,7 +26,7 @@ const SHELL = [
   "./vendor/leaflet.css",
   "./vendor/leaflet.js",
   "./vendor/lucide.js",
-  "./data/shuttle-data.js?v=20260916",
+  "./data/shuttle-data.js?v=20260921",
   "./data/shuttle-time-estimates.js?v=20260916"
 ];
 

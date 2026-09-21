@@ -3,10 +3,10 @@ import test from "node:test";
 import { accessRoutesFor, findShuttleCandidates, formatShuttleTime, isKoreaPoint, nearestShuttleStops, nextFiveMinuteValue, recommendCommuteJourneys } from "../public/commute-routing.js";
 
 const entries = [
-  { uidKey: "in-1", routeName: "아침선", routeCategory: "출근", stopOrder: 1, station: "A", lat: 37.5, lng: 127, time: "07:00", minutesToCompany: 60 },
-  { uidKey: "in-1", routeName: "아침선", routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "08:00", isCompany: true, minutesToCompany: 0 },
-  { uidKey: "out-1", routeName: "저녁선", routeCategory: "퇴근", stopOrder: 1, station: "회사", lat: 37.25, lng: 127.48, time: "18:00", isCompany: true, minutesFromCompany: 0 },
-  { uidKey: "out-1", routeName: "저녁선", routeCategory: "퇴근", stopOrder: 2, station: "B", lat: 37.51, lng: 127.01, time: "19:00", minutesFromCompany: 60 }
+  { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "in-1", routeName: "아침선", routeCategory: "출근", stopOrder: 1, station: "A", lat: 37.5, lng: 127, time: "07:00", minutesToCompany: 60 },
+  { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "in-1", routeName: "아침선", routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "08:00", isCompany: true, minutesToCompany: 0 },
+  { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "out-1", routeName: "저녁선", routeCategory: "퇴근", stopOrder: 1, station: "회사", lat: 37.25, lng: 127.48, time: "18:00", isCompany: true, minutesFromCompany: 0 },
+  { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "out-1", routeName: "저녁선", routeCategory: "퇴근", stopOrder: 2, station: "B", lat: 37.51, lng: 127.01, time: "19:00", minutesFromCompany: 60 }
 ];
 
 test("company-bound search uses selected point and catches a reachable shuttle", () => {
@@ -30,8 +30,8 @@ test("home-bound search rejects a shuttle that left before selected departure", 
 
 test("company-bound search handles a shuttle after midnight", () => {
   const overnight = [
-    { uidKey: "night-in", routeName: "심야선", routeCategory: "출근", stopOrder: 1, station: "N", time: "00:10", minutesToCompany: 50 },
-    { uidKey: "night-in", routeName: "심야선", routeCategory: "출근", stopOrder: 2, station: "회사", time: "01:00", isCompany: true, minutesToCompany: 0 }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "night-in", routeName: "심야선", routeCategory: "출근", stopOrder: 1, station: "N", time: "00:10", minutesToCompany: 50 },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "night-in", routeName: "심야선", routeCategory: "출근", stopOrder: 2, station: "회사", time: "01:00", isCompany: true, minutesToCompany: 0 }
   ];
   const routes = findShuttleCandidates({
     entries: overnight, mode: "to-company", point: { lat: 37.5, lng: 127 },
@@ -44,8 +44,8 @@ test("company-bound search handles a shuttle after midnight", () => {
 
 test("company-bound search keeps the next morning shuttle beyond twelve hours", () => {
   const nextMorning = [
-    { uidKey: "next-in", routeName: "다음날선", routeCategory: "출근", stopOrder: 1, station: "N", time: "07:30" },
-    { uidKey: "next-in", routeName: "다음날선", routeCategory: "출근", stopOrder: 2, station: "회사", time: "08:30", isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "next-in", routeName: "다음날선", routeCategory: "출근", stopOrder: 1, station: "N", time: "07:30" },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "next-in", routeName: "다음날선", routeCategory: "출근", stopOrder: 2, station: "회사", time: "08:30", isCompany: true }
   ];
   const routes = findShuttleCandidates({
     entries: nextMorning, mode: "to-company", point: { lat: 37.5, lng: 127 },
@@ -56,8 +56,8 @@ test("company-bound search keeps the next morning shuttle beyond twelve hours", 
 
 test("company-bound search rejects a shuttle almost one day away", () => {
   const nextDay = [
-    { uidKey: "departed-in", routeName: "이미 출발", routeCategory: "출근", stopOrder: 1, station: "N", lat: 37.5, lng: 127, time: "05:32" },
-    { uidKey: "departed-in", routeName: "이미 출발", routeCategory: "출근", stopOrder: 2, station: "회사", time: "06:44", isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "departed-in", routeName: "이미 출발", routeCategory: "출근", stopOrder: 1, station: "N", lat: 37.5, lng: 127, time: "05:32" },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "departed-in", routeName: "이미 출발", routeCategory: "출근", stopOrder: 2, station: "회사", time: "06:44", isCompany: true }
   ];
   const departureAt = new Date("2026-08-28T06:00:00+09:00");
   assert.deepEqual(findShuttleCandidates({
@@ -83,8 +83,8 @@ test("Korea coordinate check accepts nationwide cities and rejects overseas poin
 
 test("commute routing follows direction when route category is a regional shuttle", () => {
   const regional = [
-    { uidKey: "regional", routeName: "청주선", routeCategory: "이천->청주", direction: "퇴근", stopOrder: 1, station: "회사", time: "18:00", isCompany: true },
-    { uidKey: "regional", routeName: "청주선", routeCategory: "이천->청주", direction: "퇴근", stopOrder: 2, station: "오창", lat: 36.71, lng: 127.43, time: "19:00" }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "regional", routeName: "청주선", routeCategory: "이천->청주", direction: "퇴근", stopOrder: 1, station: "회사", time: "18:00", isCompany: true },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "regional", routeName: "청주선", routeCategory: "이천->청주", direction: "퇴근", stopOrder: 2, station: "오창", lat: 36.71, lng: 127.43, time: "19:00" }
   ];
   const routes = findShuttleCandidates({
     entries: regional, mode: "from-company", point: { lat: 36.71, lng: 127.43 },
@@ -181,10 +181,10 @@ test("walk and public transit check twelve shuttle stops while car remains cappe
 
 test("walking recommendation breaks equal total times by shorter walking time", () => {
   const tied = [
-    { uidKey: "long-walk", routeName: "빠른 셔틀", routeCategory: "퇴근", stopOrder: 1, station: "회사", time: "18:00", isCompany: true },
-    { uidKey: "long-walk", routeName: "빠른 셔틀", routeCategory: "퇴근", stopOrder: 2, station: "긴 도보", time: "18:40" },
-    { uidKey: "short-walk", routeName: "느린 셔틀", routeCategory: "퇴근", stopOrder: 1, station: "회사", time: "18:00", isCompany: true },
-    { uidKey: "short-walk", routeName: "느린 셔틀", routeCategory: "퇴근", stopOrder: 2, station: "짧은 도보", time: "18:50" }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "long-walk", routeName: "빠른 셔틀", routeCategory: "퇴근", stopOrder: 1, station: "회사", time: "18:00", isCompany: true },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "long-walk", routeName: "빠른 셔틀", routeCategory: "퇴근", stopOrder: 2, station: "긴 도보", time: "18:40" },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "short-walk", routeName: "느린 셔틀", routeCategory: "퇴근", stopOrder: 1, station: "회사", time: "18:00", isCompany: true },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "short-walk", routeName: "느린 셔틀", routeCategory: "퇴근", stopOrder: 2, station: "짧은 도보", time: "18:50" }
   ];
   const routes = recommendCommuteJourneys({
     entries: tied, mode: "from-company", point: { lat: 37.5, lng: 127 }, departureAt: new Date("2026-08-26T18:00:00+09:00"),
@@ -195,10 +195,10 @@ test("walking recommendation breaks equal total times by shorter walking time", 
 
 test("walking recommendations prefer at most 1.2 kilometers over an earlier long walk", () => {
   const entries = [
-    { uidKey: "long", routeName: "빠른 장거리", routeCategory: "출근", stopOrder: 1, station: "긴 도보", time: "07:00", minutesToCompany: 40 },
-    { uidKey: "long", routeName: "빠른 장거리", routeCategory: "출근", stopOrder: 2, station: "회사", time: "07:40", isCompany: true },
-    { uidKey: "short", routeName: "늦은 단거리", routeCategory: "출근", stopOrder: 1, station: "짧은 도보", time: "07:10", minutesToCompany: 40 },
-    { uidKey: "short", routeName: "늦은 단거리", routeCategory: "출근", stopOrder: 2, station: "회사", time: "07:50", isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "long", routeName: "빠른 장거리", routeCategory: "출근", stopOrder: 1, station: "긴 도보", time: "07:00", minutesToCompany: 40 },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "long", routeName: "빠른 장거리", routeCategory: "출근", stopOrder: 2, station: "회사", time: "07:40", isCompany: true },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "short", routeName: "늦은 단거리", routeCategory: "출근", stopOrder: 1, station: "짧은 도보", time: "07:10", minutesToCompany: 40 },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "short", routeName: "늦은 단거리", routeCategory: "출근", stopOrder: 2, station: "회사", time: "07:50", isCompany: true }
   ];
   const routes = recommendCommuteJourneys({
     entries, mode: "to-company", point: { lat: 37.5, lng: 127 }, departureAt: new Date("2026-08-28T06:00:00+09:00"),
@@ -212,12 +212,12 @@ test("walking recommendations prefer at most 1.2 kilometers over an earlier long
 
 test("walking preference is applied before candidate truncation", () => {
   const longEntries = Array.from({ length: 21 }, (_, index) => [
-    { uidKey: `long-${index}`, routeName: `빠른 장거리 ${index}`, routeCategory: "출근", stopOrder: 1, station: `긴 도보 ${index}`, time: "07:00", minutesToCompany: 40 },
-    { uidKey: `long-${index}`, routeName: `빠른 장거리 ${index}`, routeCategory: "출근", stopOrder: 2, station: "회사", time: "07:40", isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: `long-${index}`, routeName: `빠른 장거리 ${index}`, routeCategory: "출근", stopOrder: 1, station: `긴 도보 ${index}`, time: "07:00", minutesToCompany: 40 },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: `long-${index}`, routeName: `빠른 장거리 ${index}`, routeCategory: "출근", stopOrder: 2, station: "회사", time: "07:40", isCompany: true }
   ]).flat();
   const entries = [...longEntries,
-    { uidKey: "short", routeName: "늦은 단거리", routeCategory: "출근", stopOrder: 1, station: "짧은 도보", time: "07:10", minutesToCompany: 40 },
-    { uidKey: "short", routeName: "늦은 단거리", routeCategory: "출근", stopOrder: 2, station: "회사", time: "07:50", isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "short", routeName: "늦은 단거리", routeCategory: "출근", stopOrder: 1, station: "짧은 도보", time: "07:10", minutesToCompany: 40 },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "short", routeName: "늦은 단거리", routeCategory: "출근", stopOrder: 2, station: "회사", time: "07:50", isCompany: true }
   ];
   const walkRoutes = new Map(longEntries.filter(entry => !entry.isCompany).map(entry => [entry.station, { minutes: 10, distanceMeters: 1201 }]));
   walkRoutes.set("짧은 도보", { minutes: 10, distanceMeters: 1200 });
@@ -253,10 +253,10 @@ test("walk and car reject missing endpoint segments while transit keeps its conn
 
 test("nearest stop selection removes routes that already left before applying distance", () => {
   const scheduled = [
-    { uidKey: "past", routeCategory: "출근", stopOrder: 1, station: "가까운 과거", lat: 37.5, lng: 127, time: "17:00" },
-    { uidKey: "past", routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "18:00", isCompany: true },
-    { uidKey: "future", routeCategory: "출근", stopOrder: 1, station: "조금 먼 예정", lat: 37.51, lng: 127, time: "18:00" },
-    { uidKey: "future", routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "19:00", isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "past", routeCategory: "출근", stopOrder: 1, station: "가까운 과거", lat: 37.5, lng: 127, time: "17:00" },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "past", routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "18:00", isCompany: true },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "future", routeCategory: "출근", stopOrder: 1, station: "조금 먼 예정", lat: 37.51, lng: 127, time: "18:00" },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "future", routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "19:00", isCompany: true }
   ];
   const stops = nearestShuttleStops(scheduled, "to-company", { lat: 37.5, lng: 127 }, 1, new Date("2026-08-26T17:30:00+09:00"));
   assert.equal(stops[0].station, "조금 먼 예정");
@@ -265,11 +265,11 @@ test("nearest stop selection removes routes that already left before applying di
 test("nearest stop selection skips inbound stops that cannot be reached before departure", () => {
   const scheduled = [
     ...Array.from({ length: 5 }, (_, index) => [
-      { uidKey: `too-soon-${index}`, routeCategory: "출근", stopOrder: 1, station: `가까운 임박 ${index}`, lat: 37.5, lng: 127 + index * 0.0001, time: "07:01" },
-      { uidKey: `too-soon-${index}`, routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "08:00", isCompany: true }
+      { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: `too-soon-${index}`, routeCategory: "출근", stopOrder: 1, station: `가까운 임박 ${index}`, lat: 37.5, lng: 127 + index * 0.0001, time: "07:01" },
+      { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: `too-soon-${index}`, routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "08:00", isCompany: true }
     ]).flat(),
-    { uidKey: "reachable", routeCategory: "출근", stopOrder: 1, station: "도달 가능", lat: 37.51, lng: 127, time: "08:00" },
-    { uidKey: "reachable", routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "09:00", isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "reachable", routeCategory: "출근", stopOrder: 1, station: "도달 가능", lat: 37.51, lng: 127, time: "08:00" },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "reachable", routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: "09:00", isCompany: true }
   ];
   const stops = nearestShuttleStops(scheduled, "to-company", { lat: 37.5, lng: 127 }, 5, new Date("2026-08-26T07:00:00+09:00"));
   assert.deepEqual(stops.map(stop => stop.station), ["도달 가능"]);
@@ -277,10 +277,10 @@ test("nearest stop selection skips inbound stops that cannot be reached before d
 
 test("nearest stop selection skips outbound stops without arrival times", () => {
   const scheduled = [
-    { uidKey: "missing-arrival", routeCategory: "퇴근", stopOrder: 1, station: "회사", lat: 37.25, lng: 127.48, time: "18:00", isCompany: true },
-    { uidKey: "missing-arrival", routeCategory: "퇴근", stopOrder: 2, station: "가까운 시간 없음", lat: 37.5, lng: 127 },
-    { uidKey: "valid-arrival", routeCategory: "퇴근", stopOrder: 1, station: "회사", lat: 37.25, lng: 127.48, time: "18:00", isCompany: true },
-    { uidKey: "valid-arrival", routeCategory: "퇴근", stopOrder: 2, station: "도착시간 있음", lat: 37.51, lng: 127, time: "19:00" }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "missing-arrival", routeCategory: "퇴근", stopOrder: 1, station: "회사", lat: 37.25, lng: 127.48, time: "18:00", isCompany: true },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "missing-arrival", routeCategory: "퇴근", stopOrder: 2, station: "가까운 시간 없음", lat: 37.5, lng: 127 },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "valid-arrival", routeCategory: "퇴근", stopOrder: 1, station: "회사", lat: 37.25, lng: 127.48, time: "18:00", isCompany: true },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: "valid-arrival", routeCategory: "퇴근", stopOrder: 2, station: "도착시간 있음", lat: 37.51, lng: 127, time: "19:00" }
   ];
   const stops = nearestShuttleStops(scheduled, "from-company", { lat: 37.5, lng: 127 }, 1, new Date("2026-08-26T17:30:00+09:00"));
   assert.equal(stops[0].station, "도착시간 있음");
@@ -297,8 +297,8 @@ test("single-digit shuttle times display without trailing seconds", () => {
 
 test("commute recommendations contain walk, taxi, then three transit options", () => {
   const manyEntries = [1, 2, 3].flatMap(index => [
-    { uidKey: `in-${index}`, routeName: `아침선 ${index}`, routeCategory: "출근", stopOrder: 1, station: `S${index}`, lat: 37.5, lng: 127, time: `07:0${index}` },
-    { uidKey: `in-${index}`, routeName: `아침선 ${index}`, routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: `08:0${index}`, isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: `in-${index}`, routeName: `아침선 ${index}`, routeCategory: "출근", stopOrder: 1, station: `S${index}`, lat: 37.5, lng: 127, time: `07:0${index}` },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: `in-${index}`, routeName: `아침선 ${index}`, routeCategory: "출근", stopOrder: 2, station: "회사", lat: 37.25, lng: 127.48, time: `08:0${index}`, isCompany: true }
   ]);
   const minutes = new Map([["S1", 10], ["S2", 12], ["S3", 14]]);
   const routes = recommendCommuteJourneys({
@@ -313,8 +313,8 @@ test("commute recommendations contain walk, taxi, then three transit options", (
 
 test("commute recommendations skip a faster shuttle without valid geometry", () => {
   const candidates = [1, 2].flatMap(index => [
-    { uidKey: `route-${index}`, routeName: `노선 ${index}`, routeCategory: "출근", stopOrder: 1, station: `S${index}`, time: `07:0${index}` },
-    { uidKey: `route-${index}`, routeName: `노선 ${index}`, routeCategory: "출근", stopOrder: 2, station: "회사", time: `08:0${index}`, isCompany: true }
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: `route-${index}`, routeName: `노선 ${index}`, routeCategory: "출근", stopOrder: 1, station: `S${index}`, time: `07:0${index}` },
+    { serviceWeekdays: [0, 1, 2, 3, 4, 5, 6], uidKey: `route-${index}`, routeName: `노선 ${index}`, routeCategory: "출근", stopOrder: 2, station: "회사", time: `08:0${index}`, isCompany: true }
   ]);
   const routes = recommendCommuteJourneys({
     entries: candidates, mode: "to-company", point: { lat: 37.5, lng: 127 },
@@ -352,4 +352,38 @@ test("home-bound recommendations separate company wait, shuttle and final access
     { access: routes[0].accessMinutes, wait: routes[0].waitMinutes, shuttle: routes[0].shuttleMinutes, total: routes[0].totalMinutes },
     { access: 12, wait: 30, shuttle: 60, total: 102 }
   );
+});
+
+
+test("shuttle search obeys each run's service weekdays before ranking and stop limits", () => {
+  const point = { lat: 37.51, lng: 127.01 };
+  const runs = [["wed", [3]], ["fri", [5]], ["sat", [6]], ["mon-thu", [1,2,3,4]], ["weekend", [0,6]], ["daily", [0,1,2,3,4,5,6]]].flatMap(([id, serviceWeekdays]) => entries.filter(e => e.routeCategory === "퇴근").map(e => ({ ...e, uidKey: id, routeName: id, serviceWeekdays, station: e.isCompany ? "회사" : id })));
+  for (const [day, expected] of [[23,["wed","mon-thu","daily"]], [25,["fri","daily"]], [26,["sat","weekend","daily"]], [27,["weekend","daily"]]]) {
+    const departureAt = new Date(`2026-09-${day}T12:44:00+09:00`);
+    const candidates = findShuttleCandidates({ entries:runs, mode:"from-company", point, departureAt, accessMinutesByStop:new Map(runs.map(e=>[e.station,4])), limit:20 });
+    assert.deepEqual(candidates.map(e=>e.uidKey).sort(), expected.sort());
+    assert.deepEqual(nearestShuttleStops(runs,"from-company",point,20,departureAt).map(e=>e.key).sort(),expected.sort());
+  }
+});
+
+test("inbound service day follows the origin across midnight and next-day searches", () => {
+  const point = { lat:37.5, lng:127 };
+  const run = [
+    { uidKey:"overnight", routeCategory:"출근", serviceWeekdays:[5], turnStartTime:"23:50", stopOrder:1, station:"origin", time:"23:50", ...point },
+    { uidKey:"overnight", routeCategory:"출근", serviceWeekdays:[5], turnStartTime:"23:50", stopOrder:2, station:"after-midnight", time:"00:10", ...point },
+    { uidKey:"overnight", routeCategory:"출근", serviceWeekdays:[5], turnStartTime:"23:50", stopOrder:3, station:"회사", time:"01:00", isCompany:true }
+  ];
+  const search = (date, data=run) => findShuttleCandidates({entries:data,mode:"to-company",point,departureAt:new Date(date),accessMinutesByStop:new Map([["after-midnight",5]])});
+  assert.equal(search("2026-09-25T23:55:00+09:00").length,1);
+  assert.equal(search("2026-09-26T00:00:00+09:00").length,1);
+  assert.equal(search("2026-09-24T23:55:00+09:00").length,0);
+  const morning = run.slice(1).map((e,i)=>({...e, turnStartTime:"07:00",time:i?"08:00":"07:00"}));
+  assert.equal(search("2026-09-24T23:00:00+09:00",morning).length,1);
+  assert.equal(search("2026-09-25T23:00:00+09:00",morning).length,0);
+});
+
+test("unknown or empty service weekdays never create a confirmed journey", () => {
+  for (const serviceWeekdays of [undefined, []]) {
+    assert.deepEqual(findShuttleCandidates({entries:entries.map(e=>({...e,serviceWeekdays})),mode:"from-company",point:{lat:37.51,lng:127.01},departureAt:new Date("2026-09-23T12:44:00+09:00"),accessMinutesByStop:new Map([["B",5]])}),[]);
+  }
 });

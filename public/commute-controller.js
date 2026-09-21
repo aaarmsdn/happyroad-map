@@ -1,4 +1,4 @@
-import { accessRoutesFor, isKoreaPoint, nearestShuttleStops, nextFiveMinuteValue, recommendCommuteJourneys } from "./commute-routing.js?v=35";
+import { accessRoutesFor, isKoreaPoint, nearestShuttleStops, nextFiveMinuteValue, recommendCommuteJourneys } from "./commute-routing.js?v=36";
 import { commuteJourneyDetailHtml, commuteResultsHtml } from "./commute-view.js?v=8";
 import { addJourneyPaths, routeSegmentPoints } from "./route-view.js?v=4";
 import { escapeHtml } from "./ui-utils.js?v=10";
@@ -231,7 +231,7 @@ export function createCommutePlanner({ L, map, shuttle, routeLayer, commuteLayer
 
   async function calculate() {
     if (!point) return showToast("지도 또는 검색에서 위치를 선택해 주세요.");
-    const departureAt = new Date($("#commuteDepartureAt").value);
+    const departureAt = new Date(`${$("#commuteDepartureAt").value}+09:00`);
     if (!Number.isFinite(departureAt.getTime())) return showToast("출발 일시를 확인해 주세요.");
     const mode = $("#commuteMode").dataset.value || "to-company";
     setStage("results");

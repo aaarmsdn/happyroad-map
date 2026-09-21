@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import test from "node:test";
-import { applyMonthly } from "./import-shuttle-monthly.mjs";
+import { applyMonthly, applyServiceWeekdays } from "./import-shuttle-monthly.mjs";
 import { findShuttleCandidates } from "../public/commute-routing.js";
 
 const entry = (stationUid, stopOrder, direction, isCompany = false) => ({ routeUid: "r", turnUid: "t", uidKey: "r|t", stationUid, stopOrder, direction, isCompany, durationBucket: "unknown", color: "#999", durationGroup: "소요시간 없음" });
@@ -55,8 +55,34 @@ test("published data uses the verified month and never treats missing duration a
 test("page and offline shell version both shuttle assets to avoid stale HTTP caches", async () => {
   const [html, worker] = await Promise.all(["../public/index.html", "../public/sw.js"].map(file => readFile(new URL(file, import.meta.url), "utf8")));
   for (const file of ["shuttle-data", "shuttle-time-estimates"]) {
-    const url = `./data/${file}.js?v=20260916`;
+    const url = `./data/${file}.js?v=${file === "shuttle-data" ? "20260921" : "20260916"}`;
     assert.ok(html.includes(`src="${url}"`));
     assert.ok(worker.includes(`"${url}"`));
+  }
+});
+
+
+test("service calendar import preserves official weekday codes and rejects unknown codes", () => {
+  const shuttle = { entries:[{turnUid:"fri"},{turnUid:"sat"},{turnUid:"off"},{turnUid:"missing"}] };
+  const details = new Map([
+    ["fri",{earlyDriveWeekly:[{weekdayCode:"WKD-FRI",earlyMinute:0}]}],
+    ["sat",{earlyDriveWeekly:[{weekdayCode:"WKD-SAT",earlyMinute:0}]}],
+    ["off",{useYn:false,earlyDriveWeekly:[{weekdayCode:"WKD-MON",earlyMinute:0}]}]
+  ]);
+  applyServiceWeekdays(shuttle,details);
+  assert.deepEqual(shuttle.entries.map(e=>e.serviceWeekdays),[[5],[6],[],[]]);
+  assert.throws(()=>applyServiceWeekdays({entries:[{turnUid:"bad"}]},new Map([["bad",{earlyDriveWeekly:[{weekdayCode:"UNKNOWN"}]}]])),/Unknown service weekday/);
+});
+
+test("published commute runs carry validated weekday arrays and preserve restricted schedules", async () => {
+  const window = {};
+  vm.runInNewContext(await readFile(new URL("../public/data/shuttle-data.js", import.meta.url),"utf8"),{window});
+  const entries = window.HAPPYROAD_MAP_DATA.entries.filter(e=>["출근","퇴근"].includes(e.direction));
+  for (const e of entries) {
+    assert.ok(Array.isArray(e.serviceWeekdays),e.uidKey);
+    assert.ok(e.serviceWeekdays.every(d=>Number.isInteger(d)&&d>=0&&d<=6));
+  }
+  for (const [name,days] of [["천호/구의(토)",[6]],["천호/답십리(자율)(금)",[5]],["광주선(월~목)",[1,2,3,4]]]) {
+    assert.deepEqual(Array.from(entries.find(e=>e.routeName===name).serviceWeekdays),days);
   }
 });

@@ -6,20 +6,30 @@ const minutesOf = value => {
 };
 const usableMonthlyTime = entry => !entry.timeBasis || Number.isFinite(entry.displayMinutes);
 const MAX_COMMUTE_WAIT_MINUTES = 16 * 60;
+const KOREA_OFFSET_MS = 9 * 60 * 60000;
 
 const dateAtMinutes = (base, minutes) => {
-  const date = new Date(base);
-  date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-  return date;
+  const date = new Date(new Date(base).getTime() + KOREA_OFFSET_MS);
+  date.setUTCHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return new Date(date.getTime() - KOREA_OFFSET_MS);
 };
 
 const scheduledDate = (base, minutes, allowNextDay = false) => {
   const date = dateAtMinutes(base, minutes);
   if (date >= base) return date;
   if (!allowNextDay) return null;
-  date.setDate(date.getDate() + 1);
+  date.setUTCDate(date.getUTCDate() + 1);
   return date;
 };
+
+function operatesOn(entry, boardingAt) {
+  if (!Array.isArray(entry.serviceWeekdays)) return false;
+  const serviceDate = new Date(boardingAt.getTime() + KOREA_OFFSET_MS);
+  const originMinutes = minutesOf(entry.turnStartTime);
+  const boardingMinutes = serviceDate.getUTCHours() * 60 + serviceDate.getUTCMinutes();
+  if (originMinutes !== null && boardingMinutes < originMinutes) serviceDate.setUTCDate(serviceDate.getUTCDate() - 1);
+  return entry.serviceWeekdays.includes(serviceDate.getUTCDay());
+}
 
 export const isKoreaPoint = koreaPoint;
 
@@ -39,7 +49,7 @@ function routeGroups(entries, category) {
 
 export function nextFiveMinuteValue(date = new Date()) {
   const rounded = new Date(Math.ceil(date.getTime() / 300000) * 300000);
-  const local = new Date(rounded.getTime() - rounded.getTimezoneOffset() * 60000);
+  const local = new Date(rounded.getTime() + KOREA_OFFSET_MS);
   return local.toISOString().slice(0, 16);
 }
 
@@ -67,16 +77,17 @@ function upcomingStopKeys(entries, mode, departureAt, point) {
         const minutes = minutesOf(stop.time);
         const shuttleDate = minutes === null ? null : scheduledDate(departure, minutes, true);
         const fastestAccess = Math.max(5, Math.round(distanceKm(point, stop) * 2.4 + 4));
-        if (shuttleDate && shuttleDate - departure >= fastestAccess * 60000
+        if (shuttleDate && operatesOn(stop, shuttleDate) && shuttleDate - departure >= fastestAccess * 60000
           && shuttleDate - departure <= MAX_COMMUTE_WAIT_MINUTES * 60000) {
-          const target = shuttleDate.getDate() === departure.getDate() ? keys : nextDayKeys;
+          const target = dateAtMinutes(shuttleDate, 0).getTime() === dateAtMinutes(departure, 0).getTime() ? keys : nextDayKeys;
           target.add(stop.stationUid || stop.station);
         }
       });
       return;
     }
     const minutes = minutesOf(company.time);
-    if (minutes !== null && scheduledDate(departure, minutes)) {
+    const companyDate = minutes === null ? null : scheduledDate(departure, minutes);
+    if (companyDate && operatesOn(company, companyDate)) {
       group.filter(entry => !entry.isCompany && minutesOf(entry.time) !== null).forEach(stop => keys.add(stop.stationUid || stop.station));
     }
   });
@@ -111,11 +122,11 @@ export function findShuttleCandidates({ entries, mode, point, departureAt, acces
         const companyMinutes = minutesOf(company.time) ?? (shuttleMinutes + Number(stop.minutesToCompany || 0));
         if (shuttleMinutes === null || companyMinutes === null) continue;
         const shuttleDate = scheduledDate(departure, shuttleMinutes, true);
-        if (!shuttleDate) continue;
+        if (!shuttleDate || !operatesOn(stop, shuttleDate)) continue;
         if (shuttleDate - departure > MAX_COMMUTE_WAIT_MINUTES * 60000) continue;
         if (shuttleDate < new Date(departure.getTime() + access * 60000)) continue;
         const arrivalDate = dateAtMinutes(shuttleDate, companyMinutes);
-        if (arrivalDate < shuttleDate) arrivalDate.setDate(arrivalDate.getDate() + 1);
+        if (arrivalDate < shuttleDate) arrivalDate.setUTCDate(arrivalDate.getUTCDate() + 1);
         const waitMinutes = Math.round((shuttleDate - departure) / 60000) - access;
         const shuttleDuration = stop.timeBasis ? stop.minutesToCompany : Math.round((arrivalDate - shuttleDate) / 60000);
         results.push({
@@ -128,13 +139,13 @@ export function findShuttleCandidates({ entries, mode, point, departureAt, acces
     } else {
       const companyMinutes = minutesOf(company.time);
       const companyDate = companyMinutes === null ? null : scheduledDate(departure, companyMinutes);
-      if (!companyDate) continue;
+      if (!companyDate || !operatesOn(company, companyDate)) continue;
       for (const stop of group.filter(entry => !entry.isCompany)) {
         const access = accessMinutesByStop.get(stop.stationUid || stop.station);
         const stopMinutes = minutesOf(stop.time);
         if (!Number.isFinite(access) || stopMinutes === null) continue;
         const stopDate = dateAtMinutes(companyDate, stopMinutes);
-        if (stopDate < companyDate) stopDate.setDate(stopDate.getDate() + 1);
+        if (stopDate < companyDate) stopDate.setUTCDate(stopDate.getUTCDate() + 1);
         const waitMinutes = Math.round((companyDate - departure) / 60000);
         const shuttleDuration = stop.timeBasis ? stop.minutesFromCompany : Math.round((stopDate - companyDate) / 60000);
         results.push({
