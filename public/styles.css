@@ -223,6 +223,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .commute-search-view { display: grid; gap: 12px; }
 .commute-search-view[hidden], .commute-results[hidden] { display: none; }
 .commute-mode { flex: none; grid-template-columns: 1fr 1fr; }
+#commutePreferenceField[hidden] { display: none; }
 .commute-search { display: grid; grid-template-columns: 1fr 40px; align-items: end; gap: 6px; }
 .commute-search-button { border: 1px solid var(--line); background: var(--surface); }
 .secondary-command, .primary-command {

@@ -180,19 +180,23 @@ function hasDrawableRoutePoints(points, start, end, mode) {
   return distanceKm(start, first) <= maximumGap && distanceKm(end, last) <= maximumGap;
 }
 
-export async function accessRoutesFor({ stops, direction, point, apiBase, fetcher = fetch, signal }) {
+export async function accessRoutesFor({ stops, direction, point, company, apiBase, fetcher = fetch, signal }) {
   const routesByMode = new Map(ACCESS_PROFILES.map(profile => [profile.mode, new Map()]));
   if (!isKoreaPoint(point)) return routesByMode;
   const koreaStops = stops.filter(stop => isKoreaPoint(stop));
   const requests = [];
+  const direct = direction === "from-company" && company && isKoreaPoint(company);
   ACCESS_PROFILES.forEach(profile => {
-    const profileStops = koreaStops.slice(0, profile.stopLimit);
+    const profileStops = koreaStops.slice(0, profile.stopLimit - (direct && profile.mode !== "walk" ? 1 : 0));
     profileStops.forEach(stop => {
       const stopPoint = { lat: stop.lat, lng: stop.lng };
       const start = direction === "to-company" ? point : stopPoint;
       const end = direction === "to-company" ? stopPoint : point;
       requests.push({ id: requests.length, mode: profile.mode, stop, start, end });
     });
+  });
+  if (direct) ["car", "public-transit"].forEach(mode => {
+    requests.push({ id: requests.length, mode, stop: { key: "company-direct" }, start: company, end: point });
   });
   if (!apiBase || !requests.length) return routesByMode;
   try {
@@ -219,7 +223,11 @@ export async function accessRoutesFor({ stops, direction, point, apiBase, fetche
   return routesByMode;
 }
 
-export function recommendCommuteJourneys({ entries, mode, point, departureAt, accessMinutesByMode, acceptJourney = () => true, limit = 5 }) {
+export function recommendCommuteJourneys({ entries, mode, point, departureAt, accessMinutesByMode, acceptJourney = () => true, preference = "earliest-arrival", limit = 5 }) {
+  const outbound = mode === "from-company";
+  const leastTravel = outbound && preference === "least-travel";
+  const compare = (left, right) => (leastTravel ? left.travelMinutes - right.travelMinutes : left.totalMinutes - right.totalMinutes)
+    || left.totalMinutes - right.totalMinutes || left.accessMinutes - right.accessMinutes;
   const journeys = ACCESS_PROFILES.flatMap(profile => {
     const accessRoutes = accessMinutesByMode.get(profile.mode) || new Map();
     const accessMinutesByStop = new Map([...accessRoutes].map(([key, route]) => [key, Number(route?.minutes ?? route)]));
@@ -228,6 +236,9 @@ export function recommendCommuteJourneys({ entries, mode, point, departureAt, ac
         const access = accessRoutes.get(journey.stop.stationUid || journey.stop.station);
         return {
           ...journey,
+          preference: leastTravel ? "least-travel" : "earliest-arrival",
+          travelMinutes: journey.shuttleMinutes + journey.accessMinutes,
+          destinationAt: new Date(new Date(departureAt).getTime() + (journey.totalMinutes * 60000) + KOREA_OFFSET_MS).toISOString().slice(11, 16),
           accessMode: profile.mode,
           accessLabel: profile.label,
           accessEstimated: typeof access === "number" || access?.estimated !== false,
@@ -239,11 +250,26 @@ export function recommendCommuteJourneys({ entries, mode, point, departureAt, ac
         };
       })
       .filter(acceptJourney)
-      .sort((left, right) => profile.mode === "walk"
+      .sort((left, right) => !outbound && profile.mode === "walk"
         ? Number(left.accessDistanceMeters > 1200) - Number(right.accessDistanceMeters > 1200)
           || left.totalMinutes - right.totalMinutes || left.accessDistanceMeters - right.accessDistanceMeters
-        : left.totalMinutes - right.totalMinutes)
+        : compare(left, right))
       .slice(0, profile.limit);
   });
-  return journeys.slice(0, limit);
+  if (outbound) ACCESS_PROFILES.filter(profile => profile.mode !== "walk").forEach(profile => {
+    const route = accessMinutesByMode.get(profile.mode)?.get("company-direct");
+    if (!route?.points?.length || !Number.isFinite(route.minutes) || route.minutes <= 0) return;
+    journeys.push({
+      direct: true, uidKey: `direct:${profile.mode}`, routeName: "회사에서 바로 이동", station: "회사",
+      company: { lat: route.points[0][0], lng: route.points[0][1] },
+      shuttleAt: new Date(new Date(departureAt).getTime() + KOREA_OFFSET_MS).toISOString().slice(11, 16),
+      destinationAt: new Date(new Date(departureAt).getTime() + route.minutes * 60000 + KOREA_OFFSET_MS).toISOString().slice(11, 16),
+      totalMinutes: route.minutes, travelMinutes: route.minutes, waitMinutes: 0, shuttleMinutes: 0,
+      accessMinutes: route.minutes, accessMode: profile.mode, accessLabel: profile.label,
+      accessEstimated: false, accessFare: Number(route.fare || 0), accessTransfers: Number(route.transfers || 0),
+      accessDistanceMeters: Number(route.distanceMeters || 0), accessRoute: route, direction: mode,
+      preference: leastTravel ? "least-travel" : "earliest-arrival"
+    });
+  });
+  return (outbound ? journeys.sort(compare) : journeys).slice(0, limit);
 }
