@@ -213,16 +213,11 @@ test("commute result UI exposes breakdown and concrete journey detail", () => {
   assert.match(homeDetail, /회사 · 18:00 출발 · 성수역 하차/);
   assert.doesNotMatch(homeDetail, /성수역 · 18:00 출발/);
   assert.match(homeDetail, /회사 승차 → 성수역 하차/);
-  const leastTravel = { ...journey, direction: "from-company", preference: "least-travel", travelMinutes: 70, destinationAt: "19:30" };
-  assert.match(commuteResultsHtml([leastTravel]), /이동 70분/);
-  assert.match(commuteResultsHtml([leastTravel]), /대기 제외 · 이동시간 최소순/);
-  assert.match(commuteResultsHtml([leastTravel]), /목적지 도착 19:30 · 대기 포함 총 90분/);
-  assert.match(commuteJourneyDetailHtml(leastTravel), /이동 70분/);
-  assert.match(commuteJourneyDetailHtml(leastTravel), /대기[\s\S]*20분/);
-  const direct = { ...leastTravel, direct: true, routeName: "회사에서 바로 이동", waitMinutes: 0 };
-  assert.match(commuteResultsHtml([direct]), /회사 · 07:00 출발 · 바로 이동/);
-  assert.doesNotMatch(commuteResultsHtml([direct]), /<small>셔틀<\/small>/);
-  assert.doesNotMatch(commuteJourneyDetailHtml(direct), /셔틀 승차|회사 승차|까지 대기/);
+  const early = { ...journey, direction: "from-company", preference: "earliest-shuttle", destinationAt: "19:30" };
+  assert.match(commuteResultsHtml([early]), /회사 셔틀 출발이 빠른 순/);
+  assert.match(commuteResultsHtml([early]), /목적지 도착 19:30 · 대기 포함 총 90분/);
+  assert.match(commuteJourneyDetailHtml(early), /셔틀 \+ 대중교통/);
+  assert.match(commuteJourneyDetailHtml(early), /대기[\s\S]*20분/);
 });
 
 test("walk and taxi durations show route distance", () => {

@@ -6,22 +6,19 @@ const accessDuration = journey => {
   return `${journey.accessMinutes}분${distance}`;
 };
 
-const durationLabel = journey => journey.preference === "least-travel"
-  ? `이동 ${journey.travelMinutes}분` : `총 ${journey.totalMinutes}분`;
-
 export function commuteResultsHtml(journeys) {
   if (!journeys.length) return '<p class="commute-status">선택 시각 이후 이용 가능한 셔틀을 찾지 못했습니다.</p>';
   const icons = { car: "car-front", "public-transit": "train-front", walk: "footprints" };
   const basis = journeys[0].direction === "from-company"
-    ? `<p class="commute-privacy">${journeys[0].preference === "least-travel" ? "대기 제외 · 이동시간 최소순" : "대기 포함 · 가장 빠른 도착순"}</p>` : "";
+    ? `<p class="commute-privacy">${journeys[0].preference === "earliest-shuttle" ? "회사 셔틀 출발이 빠른 순" : "기존 추천 · 목적지 주변 정류장"}</p>` : "";
   return basis + journeys.map((journey, index) => `
     <article class="commute-result mode-${escapeHtml(journey.accessMode)}">
-      <div class="commute-result-head"><b><span class="commute-mode-label"><i data-lucide="${icons[journey.accessMode]}"></i>${escapeHtml(journey.accessLabel)}</span>${escapeHtml(journey.routeName)}</b><strong class="commute-duration">${durationLabel(journey)}</strong></div>
-      <span>${journey.direct ? `회사 · ${escapeHtml(journey.shuttleAt)} 출발 · 바로 이동` : `${escapeHtml(journey.station)} · 셔틀 ${escapeHtml(journey.shuttleAt)} · ${journey.direction === "from-company" ? "하차" : "도착"} ${escapeHtml(journey.arrivalAt)}`}</span>
+      <div class="commute-result-head"><b><span class="commute-mode-label"><i data-lucide="${icons[journey.accessMode]}"></i>${escapeHtml(journey.accessLabel)}</span>${escapeHtml(journey.routeName)}</b><strong class="commute-duration">총 ${journey.totalMinutes}분</strong></div>
+      <span>${escapeHtml(journey.station)} · 셔틀 ${escapeHtml(journey.shuttleAt)} · ${journey.direction === "from-company" ? "하차" : "도착"} ${escapeHtml(journey.arrivalAt)}</span>
       ${journey.direction === "from-company" && journey.destinationAt ? `<small>목적지 도착 ${escapeHtml(journey.destinationAt)} · 대기 포함 총 ${journey.totalMinutes}분</small>` : ""}
       <div class="commute-breakdown" aria-label="소요시간 구성">
         <span><small>${journey.direction === "from-company" ? "셔틀 대기" : "대기"}</small><b>${journey.waitMinutes}분</b></span>
-        <span><small>${journey.direct ? "환승" : "셔틀"}</small><b>${journey.direct ? `${journey.accessTransfers}회` : `${journey.shuttleMinutes}분`}</b></span>
+        <span><small>셔틀</small><b>${journey.shuttleMinutes}분</b></span>
         <span><small>${escapeHtml(journey.accessLabel)}</small><b>${accessDuration(journey)}</b></span>
       </div>
       <small>${journey.accessEstimated ? "거리 기반 예상" : "카카오 현재 경로"}${journey.accessTransfers ? ` · 환승 ${journey.accessTransfers}회` : ""}${journey.accessFare ? ` · ${journey.accessMode === "car" ? "택시 예상요금" : "대중교통 총요금"} ${journey.accessFare.toLocaleString("ko-KR")}원` : ""}</small>
@@ -49,21 +46,21 @@ export function commuteJourneyDetailHtml(journey) {
     minutes: journey.shuttleMinutes
   };
   const waitStep = { type: "wait", guidance: `셔틀 ${journey.shuttleAt}까지 대기`, minutes: journey.waitMinutes };
-  const steps = journey.direct ? accessSteps : journey.direction === "to-company" ? [...accessSteps, waitStep, shuttleStep] : [waitStep, shuttleStep, ...accessSteps];
+  const steps = journey.direction === "to-company" ? [...accessSteps, waitStep, shuttleStep] : [waitStep, shuttleStep, ...accessSteps];
   const labels = { shuttle: "셔틀", wait: "대기" };
-  const departureSummary = journey.direct ? `회사 · ${journey.shuttleAt} 출발 · 바로 이동` : journey.direction === "to-company"
+  const departureSummary = journey.direction === "to-company"
     ? `${journey.station} · ${journey.shuttleAt} 출발`
     : `회사 · ${journey.shuttleAt} 출발 · ${journey.station} 하차`;
-  const travelSummary = journey.direct ? journey.accessLabel : journey.direction === "to-company"
+  const travelSummary = journey.direction === "to-company"
     ? `${journey.accessLabel} + 셔틀`
     : `셔틀 + ${journey.accessLabel}`;
   return `
     <div class="commute-detail-view">
-      <div class="commute-detail-summary"><span>${escapeHtml(travelSummary)}</span><strong>${durationLabel(journey)}</strong><small>${escapeHtml(departureSummary)}</small>${journey.direction === "from-company" && journey.destinationAt ? `<small>목적지 도착 ${escapeHtml(journey.destinationAt)} · 대기 포함 총 ${journey.totalMinutes}분</small>` : ""}</div>
+      <div class="commute-detail-summary"><span>${escapeHtml(travelSummary)}</span><strong>총 ${journey.totalMinutes}분</strong><small>${escapeHtml(departureSummary)}</small>${journey.direction === "from-company" && journey.destinationAt ? `<small>목적지 도착 ${escapeHtml(journey.destinationAt)} · 대기 포함 총 ${journey.totalMinutes}분</small>` : ""}</div>
       <div class="commute-breakdown detail-breakdown" aria-label="상세 소요시간 구성">
         <span><small>총합</small><b>${journey.totalMinutes}분</b></span>
         <span><small>${journey.direction === "from-company" ? "셔틀 대기" : "대기"}</small><b>${journey.waitMinutes}분</b></span>
-        <span><small>${journey.direct ? "환승" : "셔틀"}</small><b>${journey.direct ? `${journey.accessTransfers}회` : `${journey.shuttleMinutes}분`}</b></span>
+        <span><small>셔틀</small><b>${journey.shuttleMinutes}분</b></span>
         <span><small>${escapeHtml(journey.accessLabel)}</small><b>${accessDuration(journey)}</b></span>
       </div>
       <ol class="journey-steps">${steps.map((step, index) => labels[step.type]

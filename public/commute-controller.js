@@ -1,5 +1,5 @@
-import { accessRoutesFor, isKoreaPoint, nearestShuttleStops, nextFiveMinuteValue, recommendCommuteJourneys } from "./commute-routing.js?v=38";
-import { commuteJourneyDetailHtml, commuteResultsHtml } from "./commute-view.js?v=11";
+import { accessRoutesFor, isKoreaPoint, nearestShuttleStops, nextFiveMinuteValue, recommendCommuteJourneys } from "./commute-routing.js?v=39";
+import { commuteJourneyDetailHtml, commuteResultsHtml } from "./commute-view.js?v=12";
 import { addJourneyPaths, routeSegmentPoints } from "./route-view.js?v=4";
 import { escapeHtml } from "./ui-utils.js?v=10";
 
@@ -190,7 +190,6 @@ export function createCommutePlanner({ L, map, shuttle, routeLayer, commuteLayer
   }
 
   function journeyRouteData(journey) {
-    if (journey.direct) return { path: null, start: journey.company, end: point, routeStops: [] };
     const path = shuttle.paths.find(item => item.uidKey === journey.uidKey);
     if (!path) return null;
     const inbound = journey.direction === "to-company";
@@ -203,7 +202,6 @@ export function createCommutePlanner({ L, map, shuttle, routeLayer, commuteLayer
   }
 
   function hasJourneyRoute(journey) {
-    if (journey.direct) return journey.accessRoute?.points?.length > 1;
     const route = journeyRouteData(journey);
     return Boolean(route && routeSegmentPoints(route.path.encoded, route.start, route.end, route.routeStops).length > 1);
   }
@@ -236,18 +234,18 @@ export function createCommutePlanner({ L, map, shuttle, routeLayer, commuteLayer
     const departureAt = new Date(`${$("#commuteDepartureAt").value}+09:00`);
     if (!Number.isFinite(departureAt.getTime())) return showToast("출발 일시를 확인해 주세요.");
     const mode = $("#commuteMode").dataset.value || "to-company";
-    const preference = $("#commutePreference").dataset.value || "earliest-arrival";
+    const preference = $("#commutePreference").dataset.value || "recommended";
     setStage("results");
     $("#commuteResults").innerHTML = '<p class="commute-status">셔틀과 이동 경로 계산 중</p>';
     routeController?.abort();
     routeController = new AbortController();
     const version = ++searchVersion;
-    const stops = nearestShuttleStops(shuttle.entries, mode, point, 12, departureAt);
+    const company = { lat: shuttle.company[0], lng: shuttle.company[1] };
+    const stops = nearestShuttleStops(shuttle.entries, mode, point, 12, departureAt, { preference, company });
     try {
-      const company = { lat: shuttle.company[0], lng: shuttle.company[1] };
-      const routes = await accessRoutesFor({ stops, direction: mode, point, company, apiBase, signal: routeController.signal });
+      const routes = await accessRoutesFor({ stops, direction: mode, point, apiBase, signal: routeController.signal });
       if (version === searchVersion) renderResults(recommendCommuteJourneys({
-        entries: shuttle.entries, mode, point, departureAt, preference, accessMinutesByMode: routes, acceptJourney: hasJourneyRoute
+        entries: shuttle.entries, mode, point, departureAt, preference, company, accessMinutesByMode: routes, acceptJourney: hasJourneyRoute
       }), true);
     } catch (error) {
       if (version !== searchVersion) return;
@@ -282,9 +280,9 @@ export function createCommutePlanner({ L, map, shuttle, routeLayer, commuteLayer
         item.setAttribute("aria-pressed", String(item === button));
       });
       $("#commutePreference").dataset.value = button.dataset.commutePreference;
-      $("#commutePreferenceHint").textContent = button.dataset.commutePreference === "least-travel"
-        ? "대기시간을 제외한 이동시간순입니다. 실제 대기는 따로 표시됩니다."
-        : "대기시간을 포함해 가장 빨리 도착하는 경로순입니다.";
+      $("#commutePreferenceHint").textContent = button.dataset.commutePreference === "earliest-shuttle"
+        ? "회사에서 먼저 출발하는 퇴근 셔틀순입니다. 하차 후 환승 경로도 비교합니다."
+        : "목적지 주변 정류장에서 도보·택시·대중교통 경로를 추천합니다.";
     }));
     $("#commuteDepartureAt").addEventListener("input", clearResults);
     $("#commuteUseCurrentLocation").addEventListener("click", useCurrentLocation);

@@ -94,26 +94,39 @@ function upcomingStopKeys(entries, mode, departureAt, point) {
   return keys.size ? keys : nextDayKeys;
 }
 
-export function nearestShuttleStops(entries, mode, point, limit = 5, departureAt = null) {
+export function nearestShuttleStops(entries, mode, point, limit = 5, departureAt = null, { preference = "recommended", company: companyPoint } = {}) {
   const category = mode === "to-company" ? "출근" : "퇴근";
   const upcoming = departureAt ? upcomingStopKeys(entries, mode, departureAt, point) : null;
+  const departures = new Map();
+  const early = mode === "from-company" && preference === "earliest-shuttle";
+  if (early) routeGroups(entries, category).forEach(group => {
+    const company = group.find(entry => entry.isCompany);
+    if (!company || (companyPoint && distanceKm(companyPoint, company) > 5)) return;
+    const minutes = minutesOf(company.time);
+    const date = minutes === null ? null : scheduledDate(new Date(departureAt), minutes);
+    if (!date || !operatesOn(company, date)) return;
+    group.filter(entry => !entry.isCompany && minutesOf(entry.time) !== null).forEach(entry => {
+      const key = entry.stationUid || entry.station;
+      departures.set(key, Math.min(departures.get(key) ?? Infinity, date.getTime()));
+    });
+  });
   const stops = new Map();
-  entries.filter(entry => (entry.direction || entry.routeCategory) === category && usableMonthlyTime(entry) && !entry.isCompany && (!upcoming || upcoming.has(entry.stationUid || entry.station))).forEach(entry => {
+  entries.filter(entry => (entry.direction || entry.routeCategory) === category && usableMonthlyTime(entry) && !entry.isCompany && (early ? departures.has(entry.stationUid || entry.station) : !upcoming || upcoming.has(entry.stationUid || entry.station))).forEach(entry => {
     const key = entry.stationUid || entry.station;
     const candidate = { key, station: entry.station, lat: entry.lat, lng: entry.lng, distanceKm: distanceKm(point, entry) };
     if (!stops.has(key) || candidate.distanceKm < stops.get(key).distanceKm) stops.set(key, candidate);
   });
-  return [...stops.values()].sort((a, b) => a.distanceKm - b.distanceKm).slice(0, limit);
+  return [...stops.values()].sort((a, b) => (early ? departures.get(a.key) - departures.get(b.key) : 0) || a.distanceKm - b.distanceKm).slice(0, limit);
 }
 
-export function findShuttleCandidates({ entries, mode, point, departureAt, accessMinutesByStop = new Map(), limit = 5 }) {
+export function findShuttleCandidates({ entries, mode, point, departureAt, companyPoint, accessMinutesByStop = new Map(), limit = 5 }) {
   const departure = new Date(departureAt);
   if (!Number.isFinite(departure.getTime()) || !point) return [];
   const category = mode === "to-company" ? "출근" : "퇴근";
   const results = [];
   for (const group of routeGroups(entries, category)) {
     const company = group.find(entry => entry.isCompany);
-    if (!company) continue;
+    if (!company || (companyPoint && distanceKm(companyPoint, company) > 5)) continue;
     if (mode === "to-company") {
       for (const stop of group.filter(entry => !entry.isCompany)) {
         const access = accessMinutesByStop.get(stop.stationUid || stop.station);
@@ -180,23 +193,19 @@ function hasDrawableRoutePoints(points, start, end, mode) {
   return distanceKm(start, first) <= maximumGap && distanceKm(end, last) <= maximumGap;
 }
 
-export async function accessRoutesFor({ stops, direction, point, company, apiBase, fetcher = fetch, signal }) {
+export async function accessRoutesFor({ stops, direction, point, apiBase, fetcher = fetch, signal }) {
   const routesByMode = new Map(ACCESS_PROFILES.map(profile => [profile.mode, new Map()]));
   if (!isKoreaPoint(point)) return routesByMode;
   const koreaStops = stops.filter(stop => isKoreaPoint(stop));
   const requests = [];
-  const direct = direction === "from-company" && company && isKoreaPoint(company);
   ACCESS_PROFILES.forEach(profile => {
-    const profileStops = koreaStops.slice(0, profile.stopLimit - (direct && profile.mode !== "walk" ? 1 : 0));
+    const profileStops = koreaStops.slice(0, profile.stopLimit);
     profileStops.forEach(stop => {
       const stopPoint = { lat: stop.lat, lng: stop.lng };
       const start = direction === "to-company" ? point : stopPoint;
       const end = direction === "to-company" ? stopPoint : point;
       requests.push({ id: requests.length, mode: profile.mode, stop, start, end });
     });
-  });
-  if (direct) ["car", "public-transit"].forEach(mode => {
-    requests.push({ id: requests.length, mode, stop: { key: "company-direct" }, start: company, end: point });
   });
   if (!apiBase || !requests.length) return routesByMode;
   try {
@@ -223,21 +232,19 @@ export async function accessRoutesFor({ stops, direction, point, company, apiBas
   return routesByMode;
 }
 
-export function recommendCommuteJourneys({ entries, mode, point, departureAt, accessMinutesByMode, acceptJourney = () => true, preference = "earliest-arrival", limit = 5 }) {
-  const outbound = mode === "from-company";
-  const leastTravel = outbound && preference === "least-travel";
-  const compare = (left, right) => (leastTravel ? left.travelMinutes - right.travelMinutes : left.totalMinutes - right.totalMinutes)
+export function recommendCommuteJourneys({ entries, mode, point, departureAt, company, accessMinutesByMode, acceptJourney = () => true, preference = "recommended", limit = 5 }) {
+  const early = mode === "from-company" && preference === "earliest-shuttle";
+  const compare = (left, right) => (early ? left.waitMinutes - right.waitMinutes : left.totalMinutes - right.totalMinutes)
     || left.totalMinutes - right.totalMinutes || left.accessMinutes - right.accessMinutes;
   const journeys = ACCESS_PROFILES.flatMap(profile => {
     const accessRoutes = accessMinutesByMode.get(profile.mode) || new Map();
     const accessMinutesByStop = new Map([...accessRoutes].map(([key, route]) => [key, Number(route?.minutes ?? route)]));
-    return findShuttleCandidates({ entries, mode, point, departureAt, accessMinutesByStop, limit: entries.length })
+    return findShuttleCandidates({ entries, mode, point, departureAt, companyPoint: early ? company : null, accessMinutesByStop, limit: entries.length })
       .map(journey => {
         const access = accessRoutes.get(journey.stop.stationUid || journey.stop.station);
         return {
           ...journey,
-          preference: leastTravel ? "least-travel" : "earliest-arrival",
-          travelMinutes: journey.shuttleMinutes + journey.accessMinutes,
+          preference: early ? "earliest-shuttle" : "recommended",
           destinationAt: new Date(new Date(departureAt).getTime() + (journey.totalMinutes * 60000) + KOREA_OFFSET_MS).toISOString().slice(11, 16),
           accessMode: profile.mode,
           accessLabel: profile.label,
@@ -250,26 +257,11 @@ export function recommendCommuteJourneys({ entries, mode, point, departureAt, ac
         };
       })
       .filter(acceptJourney)
-      .sort((left, right) => !outbound && profile.mode === "walk"
+      .sort((left, right) => !early && profile.mode === "walk"
         ? Number(left.accessDistanceMeters > 1200) - Number(right.accessDistanceMeters > 1200)
           || left.totalMinutes - right.totalMinutes || left.accessDistanceMeters - right.accessDistanceMeters
         : compare(left, right))
       .slice(0, profile.limit);
   });
-  if (outbound) ACCESS_PROFILES.filter(profile => profile.mode !== "walk").forEach(profile => {
-    const route = accessMinutesByMode.get(profile.mode)?.get("company-direct");
-    if (!route?.points?.length || !Number.isFinite(route.minutes) || route.minutes <= 0) return;
-    journeys.push({
-      direct: true, uidKey: `direct:${profile.mode}`, routeName: "회사에서 바로 이동", station: "회사",
-      company: { lat: route.points[0][0], lng: route.points[0][1] },
-      shuttleAt: new Date(new Date(departureAt).getTime() + KOREA_OFFSET_MS).toISOString().slice(11, 16),
-      destinationAt: new Date(new Date(departureAt).getTime() + route.minutes * 60000 + KOREA_OFFSET_MS).toISOString().slice(11, 16),
-      totalMinutes: route.minutes, travelMinutes: route.minutes, waitMinutes: 0, shuttleMinutes: 0,
-      accessMinutes: route.minutes, accessMode: profile.mode, accessLabel: profile.label,
-      accessEstimated: false, accessFare: Number(route.fare || 0), accessTransfers: Number(route.transfers || 0),
-      accessDistanceMeters: Number(route.distanceMeters || 0), accessRoute: route, direction: mode,
-      preference: leastTravel ? "least-travel" : "earliest-arrival"
-    });
-  });
-  return (outbound ? journeys.sort(compare) : journeys).slice(0, limit);
+  return (early ? journeys.sort(compare) : journeys).slice(0, limit);
 }

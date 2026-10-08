@@ -295,10 +295,11 @@ test("single-digit shuttle times display without trailing seconds", () => {
   assert.equal(formatShuttleTime("7:26:04"), "07:26");
 });
 
-test("outbound preference compares travel time and earliest arrival before truncation", () => {
+test("outbound original search and earliest company shuttle compare different criteria", () => {
   const runs = [
-    { uidKey: "early", routeName: "먼저 출발", time: "13:00", arrival: "14:20", station: "A" },
-    { uidKey: "late", routeName: "짧은 이동", time: "17:00", arrival: "17:30", station: "B" }
+    { uidKey: "early", routeName: "먼저 출발", time: "13:00", arrival: "16:20", station: "A" },
+    { uidKey: "late", routeName: "다음 출발", time: "14:00", arrival: "14:30", station: "B" },
+    { uidKey: "night", routeName: "야간", time: "23:20", arrival: "23:30", station: "C" }
   ];
   const entries = runs.flatMap(run => [
     { ...run, routeCategory: "퇴근", serviceWeekdays: [4], stopOrder: 1, station: "회사", isCompany: true },
@@ -307,33 +308,24 @@ test("outbound preference compares travel time and earliest arrival before trunc
   const input = {
     entries, mode: "from-company", point: { lat: 37.5, lng: 127 }, departureAt: new Date("2026-10-08T12:00:00+09:00"),
     accessMinutesByMode: new Map([
-      ["walk", new Map([["A", 20], ["B", 10]])],
-      ["public-transit", new Map([["A", 5], ["B", 15]])]
+      ["walk", new Map([["A", 20], ["B", 10], ["C", 1]])],
+      ["public-transit", new Map([["A", 5], ["B", 15], ["C", 1]])]
     ]), limit: 1
   };
-  const early = recommendCommuteJourneys(input)[0];
+  assert.equal(recommendCommuteJourneys(input)[0].uidKey, "late");
+  const early = recommendCommuteJourneys({ ...input, preference: "earliest-shuttle" })[0];
   assert.equal(early.uidKey, "early");
   assert.equal(early.accessMode, "public-transit");
-  assert.equal(early.totalMinutes, 145);
-  assert.equal(early.destinationAt, "14:25");
-  const short = recommendCommuteJourneys({ ...input, preference: "least-travel" })[0];
-  assert.equal(short.uidKey, "late");
-  assert.equal(short.travelMinutes, 40);
-  assert.equal(short.waitMinutes, 300);
-  assert.equal(short.totalMinutes, 340);
-  assert.equal(short.destinationAt, "17:40");
+  assert.equal(early.totalMinutes, 265);
+  assert.equal(early.destinationAt, "16:25");
   input.accessMinutesByMode.get("public-transit").set("company-direct", {
     minutes: 100, fare: 3550, transfers: 2, points: [[37.25, 127.48], [37.5, 127]]
   });
-  const immediate = recommendCommuteJourneys(input)[0];
-  assert.equal(immediate.direct, true);
-  assert.equal(immediate.totalMinutes, 100);
-  assert.equal(immediate.waitMinutes, 0);
-  assert.equal(immediate.destinationAt, "13:40");
-  assert.equal(recommendCommuteJourneys({ ...input, preference: "least-travel" })[0].uidKey, "late");
+  assert.equal(recommendCommuteJourneys(input)[0].uidKey, "late");
+  assert.equal(recommendCommuteJourneys({ ...input, preference: "earliest-shuttle" })[0].uidKey, "early");
 });
 
-test("outbound direct connections stay in one valid 27-route Worker batch", async () => {
+test("outbound connections query only shuttle stops in one 27-route Worker batch", async () => {
   const company = { lat: 37.25, lng: 127.48 };
   const point = { lat: 37.5, lng: 127 };
   const stops = Array.from({ length: 12 }, (_, index) => ({ key: String(index), lat: 37.51, lng: 127 }));
@@ -344,16 +336,34 @@ test("outbound direct connections stay in one valid 27-route Worker batch", asyn
       calls += 1;
       const requests = JSON.parse(options.body).routes;
       assert.equal(requests.length, 27);
-      assert.deepEqual(requests.slice(-2).map(request => request.start), [company, company]);
-      assert.deepEqual(requests.slice(-2).map(request => request.end), [point, point]);
+      assert.ok(requests.every(request => request.start.lat === 37.51));
+      assert.ok(requests.every(request => request.end.lat === point.lat));
       return Response.json({ routes: requests.map(request => ({ id: request.id, route: {
         minutes: 20, points: [[request.start.lat, request.start.lng], [request.end.lat, request.end.lng]]
       } })) });
     }
   });
   assert.equal(calls, 1);
-  assert.equal(routes.get("car").get("company-direct").minutes, 20);
-  assert.equal(routes.get("public-transit").get("company-direct").minutes, 20);
+  assert.equal(routes.get("car").size, 3);
+  assert.equal(routes.get("public-transit").size, 12);
+  assert.equal(routes.get("public-transit").has("company-direct"), false);
+});
+
+test("earliest shuttle stop selection includes farther transfers and excludes other campuses and local shuttles", () => {
+  const point = { lat: 37.54458, lng: 127.05591 };
+  const company = { lat: 37.25, lng: 127.48 };
+  const entries = [
+    { uidKey: "near", station: "성수", time: "17:00", lat: point.lat, lng: point.lng, category: "퇴근" },
+    { uidKey: "transfer", station: "잠실", time: "13:30", lat: 37.513, lng: 127.1, category: "퇴근" },
+    { uidKey: "local", station: "부발역", time: "12:10", lat: 37.26, lng: 127.49, category: "기타셔틀" },
+    { uidKey: "other", station: "다른 캠퍼스", time: "12:20", lat: point.lat, lng: point.lng, category: "퇴근", company: { lat: 36.6, lng: 127.4 } }
+  ].flatMap(run => [
+    { ...run, ...(run.company || company), station: "회사", routeCategory: run.category, stopOrder: 1, isCompany: true, serviceWeekdays: [4] },
+    { ...run, routeCategory: run.category, stopOrder: 2, time: "18:00", serviceWeekdays: [4] }
+  ]);
+  const date = new Date("2026-10-08T12:00:00+09:00");
+  assert.equal(nearestShuttleStops(entries, "from-company", point, 1, date)[0].station, "성수");
+  assert.equal(nearestShuttleStops(entries, "from-company", point, 1, date, { preference: "earliest-shuttle", company })[0].station, "잠실");
 });
 
 test("commute recommendations contain walk, taxi, then three transit options", () => {

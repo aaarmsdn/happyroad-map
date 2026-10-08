@@ -180,10 +180,10 @@
         <div class="field" id="commutePreferenceField" hidden>
           <span>추천 기준</span>
           <div class="segmented-control commute-mode" id="commutePreference" role="group" aria-label="퇴근 추천 기준">
-            <button class="segment active" type="button" data-commute-preference="earliest-arrival" aria-pressed="true">가장 빠른 도착</button>
-            <button class="segment" type="button" data-commute-preference="least-travel" aria-pressed="false">이동시간 최소</button>
+            <button class="segment active" type="button" data-commute-preference="recommended" aria-pressed="true">기존 추천</button>
+            <button class="segment" type="button" data-commute-preference="earliest-shuttle" aria-pressed="false">빠른 셔틀 출발</button>
           </div>
-          <p class="commute-privacy" id="commutePreferenceHint">대기시간을 포함해 가장 빨리 도착하는 경로순입니다.</p>
+          <p class="commute-privacy" id="commutePreferenceHint">목적지 주변 정류장에서 도보·택시·대중교통 경로를 추천합니다.</p>
         </div>
         <label class="field">
           <span>출발 일시</span>
@@ -228,6 +228,6 @@
   <script src="./vendor/leaflet.js"></script>
   <script src="./data/shuttle-data.js?v=20260921"></script>
   <script src="./data/shuttle-time-estimates.js?v=20260916"></script>
-  <script type="module" src="./app-main.js?v=168"></script>
+  <script type="module" src="./app-main.js?v=169"></script>
 </body>
 </html>
